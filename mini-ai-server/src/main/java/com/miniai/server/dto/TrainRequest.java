@@ -7,6 +7,7 @@ public class TrainRequest {
     private String corpusPath;
     private String outputPath;
     private String tokenizerType = "whitespace"; // "whitespace" or "code"
+    private String modelType = "bigram"; // "bigram" or "trigram"
 
     public TrainRequest() {
     }
@@ -48,5 +49,17 @@ public class TrainRequest {
 
     public boolean useCodeTokenizer() {
         return "code".equalsIgnoreCase(tokenizerType);
+    }
+
+    public String getModelType() {
+        return modelType;
+    }
+
+    public void setModelType(String modelType) {
+        this.modelType = modelType;
+    }
+
+    public boolean useTrigram() {
+        return "trigram".equalsIgnoreCase(modelType);
     }
 }

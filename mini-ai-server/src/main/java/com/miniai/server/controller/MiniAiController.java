@@ -1,11 +1,14 @@
 package com.miniai.server.controller;
 
 import com.codeai.tokenizer.CodeTokenizer;
+import com.miniai.core.model.LanguageModel;
 import com.miniai.core.tokenizer.Tokenizer;
 import com.miniai.core.types.GenerateRequest;
 import com.miniai.core.types.GenerateResponse;
 import com.miniai.model.BigramModel;
 import com.miniai.model.BigramTrainer;
+import com.miniai.model.TrigramModel;
+import com.miniai.model.TrigramTrainer;
 import com.miniai.server.dto.GenerateRequestDto;
 import com.miniai.server.dto.GenerateResponseDto;
 import com.miniai.server.dto.TrainRequest;
@@ -19,15 +22,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Mini AI REST API Controller
+ * Code AI REST API Controller
  *
- * Step 5: REST API 엔드포인트
+ * Supports both Bigram and Trigram models
  */
 @RestController
 @RequestMapping("/v1")
 public class MiniAiController {
 
-    private BigramModel model;
+    private LanguageModel model;
     private final String defaultArtifactPath = "data/sample-bigram.json";
 
     public MiniAiController() {
@@ -71,14 +74,25 @@ public class MiniAiController {
                 System.out.println("📝 Using WhitespaceTokenizer (default)");
             }
 
-            // 학습
+            // 학습 (Bigram or Trigram)
             long startTime = System.currentTimeMillis();
-            BigramTrainer trainer = new BigramTrainer(tokenizer);
-            trainer.train(corpusPath, outputPath);
-            long latency = System.currentTimeMillis() - startTime;
+            String modelTypeName;
 
-            // 학습된 모델 로드
-            this.model = BigramModel.fromArtifact(outputPath);
+            if (request.useTrigram()) {
+                TrigramTrainer trainer = new TrigramTrainer(tokenizer);
+                trainer.train(corpusPath, outputPath);
+                this.model = TrigramModel.fromArtifact(outputPath);
+                modelTypeName = "trigram";
+                System.out.println("📊 Using Trigram model (2-token context)");
+            } else {
+                BigramTrainer trainer = new BigramTrainer(tokenizer);
+                trainer.train(corpusPath, outputPath);
+                this.model = BigramModel.fromArtifact(outputPath);
+                modelTypeName = "bigram";
+                System.out.println("📈 Using Bigram model (1-token context)");
+            }
+
+            long latency = System.currentTimeMillis() - startTime;
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "success");
@@ -86,6 +100,7 @@ public class MiniAiController {
             response.put("artifactPath", outputPath.toString());
             response.put("vocabSize", tokenizer.vocabSize());
             response.put("tokenizer", tokenizerName);
+            response.put("modelType", modelTypeName);
             response.put("latencyMs", latency);
 
             return response;
