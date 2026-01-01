@@ -1,5 +1,6 @@
 package com.miniai.model;
 
+import com.codeai.tokenizer.CodeTokenizer;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.miniai.core.model.Trainer;
@@ -89,15 +90,23 @@ public class BigramTrainer implements Trainer {
             nextCounts.put(nextToken, nextCounts.getOrDefault(nextToken, 0) + 1);
         }
 
-        // 3. Vocabulary 추출
+        // 3. Vocabulary 추출 및 토크나이저 타입 결정
         Map<String, Integer> vocabulary = new HashMap<>();
-        if (tokenizer instanceof WhitespaceTokenizer) {
+        String tokenizerType;
+
+        if (tokenizer instanceof CodeTokenizer) {
+            vocabulary = ((CodeTokenizer) tokenizer).getVocabulary();
+            tokenizerType = "CodeTokenizer";
+        } else if (tokenizer instanceof WhitespaceTokenizer) {
             vocabulary = ((WhitespaceTokenizer) tokenizer).getVocabulary();
+            tokenizerType = "WhitespaceTokenizer";
+        } else {
+            tokenizerType = tokenizer.getClass().getSimpleName();
         }
 
         // 4. Metadata 생성
         BigramArtifact.Metadata metadata = new BigramArtifact.Metadata();
-        metadata.setTokenizerType("WhitespaceTokenizer");
+        metadata.setTokenizerType(tokenizerType);
         metadata.setVocabSize(tokenizer.vocabSize());
         metadata.setTotalTokens(tokens.size());
         metadata.setTotalBigrams(tokens.size() - 1);

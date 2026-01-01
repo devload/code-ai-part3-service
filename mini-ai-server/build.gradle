@@ -8,6 +8,7 @@ plugins {
 dependencies {
     implementation project(':mini-ai-core')
     implementation project(':mini-ai-tokenizer-simple')
+    implementation project(':code-ai-tokenizer')
     implementation project(':mini-ai-model-ngram')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'

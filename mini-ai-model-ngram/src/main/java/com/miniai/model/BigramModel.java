@@ -1,5 +1,6 @@
 package com.miniai.model;
 
+import com.codeai.tokenizer.CodeTokenizer;
 import com.miniai.core.model.LanguageModel;
 import com.miniai.core.tokenizer.Tokenizer;
 import com.miniai.core.types.GenerateRequest;
@@ -39,8 +40,17 @@ public class BigramModel implements LanguageModel {
     public static BigramModel fromArtifact(Path artifactPath) {
         BigramArtifact artifact = BigramTrainer.loadArtifact(artifactPath);
 
-        // Vocabulary로부터 Tokenizer 생성
-        Tokenizer tokenizer = new WhitespaceTokenizer(artifact.getVocabulary());
+        // Vocabulary와 토크나이저 타입으로 Tokenizer 생성
+        Tokenizer tokenizer;
+        String tokenizerType = artifact.getMetadata().getTokenizerType();
+
+        if ("CodeTokenizer".equals(tokenizerType)) {
+            tokenizer = new CodeTokenizer(artifact.getVocabulary());
+            System.out.println("🔧 모델 로드: CodeTokenizer 사용");
+        } else {
+            tokenizer = new WhitespaceTokenizer(artifact.getVocabulary());
+            System.out.println("📝 모델 로드: WhitespaceTokenizer 사용");
+        }
 
         return new BigramModel(artifact, tokenizer);
     }

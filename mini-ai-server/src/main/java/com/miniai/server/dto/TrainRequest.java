@@ -6,6 +6,7 @@ package com.miniai.server.dto;
 public class TrainRequest {
     private String corpusPath;
     private String outputPath;
+    private String tokenizerType = "whitespace"; // "whitespace" or "code"
 
     public TrainRequest() {
     }
@@ -13,6 +14,12 @@ public class TrainRequest {
     public TrainRequest(String corpusPath, String outputPath) {
         this.corpusPath = corpusPath;
         this.outputPath = outputPath;
+    }
+
+    public TrainRequest(String corpusPath, String outputPath, String tokenizerType) {
+        this.corpusPath = corpusPath;
+        this.outputPath = outputPath;
+        this.tokenizerType = tokenizerType;
     }
 
     public String getCorpusPath() {
@@ -29,5 +36,17 @@ public class TrainRequest {
 
     public void setOutputPath(String outputPath) {
         this.outputPath = outputPath;
+    }
+
+    public String getTokenizerType() {
+        return tokenizerType;
+    }
+
+    public void setTokenizerType(String tokenizerType) {
+        this.tokenizerType = tokenizerType;
+    }
+
+    public boolean useCodeTokenizer() {
+        return "code".equalsIgnoreCase(tokenizerType);
     }
 }

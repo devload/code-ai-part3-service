@@ -1,5 +1,7 @@
 package com.miniai.server.controller;
 
+import com.codeai.tokenizer.CodeTokenizer;
+import com.miniai.core.tokenizer.Tokenizer;
 import com.miniai.core.types.GenerateRequest;
 import com.miniai.core.types.GenerateResponse;
 import com.miniai.model.BigramModel;
@@ -55,7 +57,19 @@ public class MiniAiController {
 
             // Corpus 읽기
             String corpus = Files.readString(corpusPath);
-            WhitespaceTokenizer tokenizer = WhitespaceTokenizer.fromText(corpus);
+
+            // 토크나이저 선택
+            Tokenizer tokenizer;
+            String tokenizerName;
+            if (request.useCodeTokenizer()) {
+                tokenizer = CodeTokenizer.fromCode(corpus);
+                tokenizerName = "CodeTokenizer";
+                System.out.println("🔧 Using CodeTokenizer (code-aware)");
+            } else {
+                tokenizer = WhitespaceTokenizer.fromText(corpus);
+                tokenizerName = "WhitespaceTokenizer";
+                System.out.println("📝 Using WhitespaceTokenizer (default)");
+            }
 
             // 학습
             long startTime = System.currentTimeMillis();
@@ -71,6 +85,7 @@ public class MiniAiController {
             response.put("message", "학습 완료");
             response.put("artifactPath", outputPath.toString());
             response.put("vocabSize", tokenizer.vocabSize());
+            response.put("tokenizer", tokenizerName);
             response.put("latencyMs", latency);
 
             return response;
