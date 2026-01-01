@@ -15,8 +15,8 @@ import java.util.concurrent.Callable;
  * Code AI CLI
  * 코드 특화 AI 어시스턴트 CLI
  */
-@Command(name = "code-ai", version = "2.0",
-         description = "Code AI CLI - 코드 자동완성 및 생성",
+@Command(name = "code-ai", version = "3.0",
+         description = "Code AI CLI - 코드 자동완성 및 생성 (N-gram + Kneser-Ney)",
          subcommands = {
              MiniAiCli.Train.class,
              MiniAiCli.Run.class,
@@ -32,23 +32,23 @@ public class MiniAiCli implements Callable<Integer> {
 
     @Override
     public Integer call() {
-        System.out.println("🔧 Code AI CLI v2.0");
+        System.out.println("🔧 Code AI CLI v3.0");
         System.out.println("사용법: code-ai [command]");
         System.out.println("\n명령어:");
-        System.out.println("  train      - 모델 학습 (Bigram/Trigram, Code/Whitespace)");
+        System.out.println("  train      - 모델 학습 (Bigram/Trigram/N-gram)");
         System.out.println("  run        - 텍스트 생성");
         System.out.println("  complete   - 코드 자동완성");
         System.out.println("  tokenize   - 텍스트 토큰화");
         System.out.println("\n예시:");
-        System.out.println("  code-ai train --corpus data/code.txt --model trigram --tokenizer code");
+        System.out.println("  code-ai train --corpus data/code.txt --model ngram --n 5 --smoothing kneser-ney");
         System.out.println("  code-ai complete \"public class User {\"");
         return 0;
     }
 
     /**
-     * train 명령어 - Bigram/Trigram, Code/Whitespace 선택 가능
+     * train 명령어 - Bigram/Trigram/N-gram, Code/Whitespace, Smoothing 선택 가능
      */
-    @Command(name = "train", description = "모델 학습 (Bigram/Trigram)")
+    @Command(name = "train", description = "모델 학습 (Bigram/Trigram/N-gram)")
     static class Train implements Callable<Integer> {
         @Option(names = {"--corpus"}, required = true, description = "Corpus 파일 경로")
         String corpusPath;
@@ -57,13 +57,21 @@ public class MiniAiCli implements Callable<Integer> {
                 defaultValue = "data/code-model.json")
         String outputPath;
 
-        @Option(names = {"--model"}, description = "모델 타입 (bigram/trigram)",
-                defaultValue = "trigram")
+        @Option(names = {"--model"}, description = "모델 타입 (bigram/trigram/ngram)",
+                defaultValue = "ngram")
         String modelType;
+
+        @Option(names = {"-n"}, description = "N-gram 크기 (ngram 모델용)",
+                defaultValue = "5")
+        int n;
 
         @Option(names = {"--tokenizer"}, description = "토크나이저 (whitespace/code)",
                 defaultValue = "code")
         String tokenizerType;
+
+        @Option(names = {"--smoothing"}, description = "Smoothing (simple/kneser-ney)",
+                defaultValue = "kneser-ney")
+        String smoothingType;
 
         @Override
         public Integer call() {
@@ -71,15 +79,19 @@ public class MiniAiCli implements Callable<Integer> {
                 System.out.println("🚀 모델 학습 시작...");
                 System.out.println("  Corpus: " + corpusPath);
                 System.out.println("  Output: " + outputPath);
-                System.out.println("  Model: " + modelType);
+                System.out.println("  Model: " + modelType + (modelType.equals("ngram") ? " (n=" + n + ")" : ""));
                 System.out.println("  Tokenizer: " + tokenizerType);
+                System.out.println("  Smoothing: " + smoothingType);
 
-                String json = gson.toJson(Map.of(
-                    "corpusPath", corpusPath,
-                    "outputPath", outputPath,
-                    "modelType", modelType,
-                    "tokenizerType", tokenizerType
-                ));
+                java.util.Map<String, Object> requestMap = new java.util.HashMap<>();
+                requestMap.put("corpusPath", corpusPath);
+                requestMap.put("outputPath", outputPath);
+                requestMap.put("modelType", modelType);
+                requestMap.put("tokenizerType", tokenizerType);
+                requestMap.put("n", n);
+                requestMap.put("smoothingType", smoothingType);
+
+                String json = gson.toJson(requestMap);
 
                 Request request = new Request.Builder()
                     .url(API_BASE + "/train")
@@ -94,6 +106,7 @@ public class MiniAiCli implements Callable<Integer> {
                         System.out.println("\n✅ 학습 완료!");
                         System.out.println("  Model: " + result.get("modelType"));
                         System.out.println("  Tokenizer: " + result.get("tokenizer"));
+                        System.out.println("  Smoothing: " + result.get("smoothing"));
                         System.out.println("  Vocabulary: " + result.get("vocabSize"));
                         System.out.println("  Latency: " + result.get("latencyMs") + "ms");
                     } else {

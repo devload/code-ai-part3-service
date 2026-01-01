@@ -2,12 +2,20 @@ package com.miniai.server.dto;
 
 /**
  * /v1/train 요청 DTO
+ *
+ * 지원 옵션:
+ * - modelType: "bigram", "trigram", "ngram" (기본: bigram)
+ * - n: N-gram 크기 (modelType=ngram일 때, 기본: 5)
+ * - tokenizerType: "whitespace", "code" (기본: whitespace)
+ * - smoothingType: "simple", "kneser-ney" (기본: simple)
  */
 public class TrainRequest {
     private String corpusPath;
     private String outputPath;
     private String tokenizerType = "whitespace"; // "whitespace" or "code"
-    private String modelType = "bigram"; // "bigram" or "trigram"
+    private String modelType = "bigram"; // "bigram", "trigram", or "ngram"
+    private int n = 5; // N-gram size (for modelType=ngram)
+    private String smoothingType = "simple"; // "simple" or "kneser-ney"
 
     public TrainRequest() {
     }
@@ -61,5 +69,29 @@ public class TrainRequest {
 
     public boolean useTrigram() {
         return "trigram".equalsIgnoreCase(modelType);
+    }
+
+    public boolean useNgram() {
+        return "ngram".equalsIgnoreCase(modelType);
+    }
+
+    public int getN() {
+        return n;
+    }
+
+    public void setN(int n) {
+        this.n = n;
+    }
+
+    public String getSmoothingType() {
+        return smoothingType;
+    }
+
+    public void setSmoothingType(String smoothingType) {
+        this.smoothingType = smoothingType;
+    }
+
+    public boolean useKneserNey() {
+        return "kneser-ney".equalsIgnoreCase(smoothingType);
     }
 }

@@ -9,6 +9,11 @@ import com.miniai.model.BigramModel;
 import com.miniai.model.BigramTrainer;
 import com.miniai.model.TrigramModel;
 import com.miniai.model.TrigramTrainer;
+import com.miniai.model.ngram.NgramModel;
+import com.miniai.model.ngram.NgramTrainer;
+import com.miniai.model.smoothing.KneserNey;
+import com.miniai.model.smoothing.SimpleBackoff;
+import com.miniai.model.smoothing.SmoothingStrategy;
 import com.miniai.server.dto.GenerateRequestDto;
 import com.miniai.server.dto.GenerateResponseDto;
 import com.miniai.server.dto.TrainRequest;
@@ -24,7 +29,8 @@ import java.util.Map;
 /**
  * Code AI REST API Controller
  *
- * Supports both Bigram and Trigram models
+ * Supports Bigram, Trigram, and N-gram models
+ * With SimpleBackoff and Kneser-Ney smoothing
  */
 @RestController
 @RequestMapping("/v1")
@@ -74,11 +80,34 @@ public class MiniAiController {
                 System.out.println("📝 Using WhitespaceTokenizer (default)");
             }
 
-            // 학습 (Bigram or Trigram)
+            // 학습 (Bigram, Trigram, or N-gram)
             long startTime = System.currentTimeMillis();
             String modelTypeName;
+            String smoothingName = "none";
 
-            if (request.useTrigram()) {
+            if (request.useNgram()) {
+                // N-gram with configurable smoothing
+                int n = request.getN();
+                NgramTrainer trainer = new NgramTrainer(n, tokenizer);
+                trainer.train(corpusPath, outputPath);
+
+                // Smoothing 전략 선택
+                SmoothingStrategy smoothing;
+                if (request.useKneserNey()) {
+                    smoothing = new KneserNey();
+                    smoothingName = "kneser-ney";
+                    System.out.println("🎯 Using Kneser-Ney smoothing");
+                } else {
+                    smoothing = new SimpleBackoff();
+                    smoothingName = "simple-backoff";
+                    System.out.println("📊 Using Simple Backoff smoothing");
+                }
+
+                this.model = NgramModel.fromArtifact(outputPath, smoothing);
+                modelTypeName = n + "-gram";
+                System.out.println("📊 Using " + n + "-gram model (" + (n-1) + "-token context)");
+
+            } else if (request.useTrigram()) {
                 TrigramTrainer trainer = new TrigramTrainer(tokenizer);
                 trainer.train(corpusPath, outputPath);
                 this.model = TrigramModel.fromArtifact(outputPath);
@@ -101,6 +130,7 @@ public class MiniAiController {
             response.put("vocabSize", tokenizer.vocabSize());
             response.put("tokenizer", tokenizerName);
             response.put("modelType", modelTypeName);
+            response.put("smoothing", smoothingName);
             response.put("latencyMs", latency);
 
             return response;
