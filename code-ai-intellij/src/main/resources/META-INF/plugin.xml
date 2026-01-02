@@ -1,0 +1,78 @@
+<idea-plugin>
+    <id>com.codeai.intellij</id>
+    <name>Code AI Review</name>
+    <vendor email="support@code-ai.dev" url="https://github.com/code-ai">Code AI Team</vendor>
+
+    <description><![CDATA[
+        <h2>Code AI Review - AI 기반 코드 리뷰 플러그인</h2>
+
+        <p>Java 코드를 분석하여 자연어 형태의 피드백을 제공하는 AI 코드 리뷰 플러그인입니다.</p>
+
+        <h3>주요 기능:</h3>
+        <ul>
+            <li><b>AI 코드 리뷰</b> - 자연어 형태의 친근한 피드백</li>
+            <li><b>코드 품질 점수</b> - 6가지 차원의 점수 및 A-F 등급</li>
+            <li><b>AST 기반 분석</b> - 정확한 코드 구조 분석</li>
+            <li><b>보안 취약점 탐지</b> - SQL Injection, 하드코딩된 비밀정보 등</li>
+            <li><b>리팩토링 제안</b> - 개선 예시 코드 제공</li>
+        </ul>
+
+        <h3>사용법:</h3>
+        <ol>
+            <li>Java 파일을 열고</li>
+            <li>에디터에서 우클릭 → Code AI → AI Review 선택</li>
+            <li>또는 Tools → Code AI → AI Review 메뉴 사용</li>
+        </ol>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Project Service -->
+        <projectService serviceImplementation="com.codeai.intellij.service.CodeAIService"/>
+
+        <!-- Tool Window -->
+        <toolWindow id="Code AI Review"
+                    secondary="true"
+                    icon="/icons/codeai.svg"
+                    anchor="bottom"
+                    factoryClass="com.codeai.intellij.toolwindow.CodeAIToolWindowFactory"/>
+
+        <!-- Notification Group -->
+        <notificationGroup id="Code AI Notifications"
+                          displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <!-- AI Review Action Group -->
+        <group id="CodeAI.ActionGroup" text="Code AI" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+
+            <!-- AI Review Action -->
+            <action id="CodeAI.AIReview"
+                    class="com.codeai.intellij.action.AIReviewAction"
+                    text="AI Review"
+                    description="AI 기반 코드 리뷰 실행"
+                    icon="/icons/review.svg">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt R"/>
+            </action>
+
+            <!-- AST Review Action -->
+            <action id="CodeAI.ASTReview"
+                    class="com.codeai.intellij.action.ASTReviewAction"
+                    text="AST Review"
+                    description="AST 기반 코드 리뷰 실행">
+            </action>
+
+            <!-- Quick Score Action -->
+            <action id="CodeAI.QuickScore"
+                    class="com.codeai.intellij.action.QuickScoreAction"
+                    text="Quick Score"
+                    description="빠른 코드 품질 점수 확인">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt S"/>
+            </action>
+        </group>
+    </actions>
+</idea-plugin>

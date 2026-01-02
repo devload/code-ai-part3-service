@@ -1,0 +1,106 @@
+{
+  "name": "code-ai-review",
+  "displayName": "Code AI Review",
+  "description": "AI 기반 Java 코드 리뷰 확장",
+  "version": "1.0.0",
+  "publisher": "code-ai",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "java",
+    "code review",
+    "ai",
+    "code quality"
+  ],
+  "activationEvents": [
+    "onLanguage:java"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeai.aiReview",
+        "title": "AI Review",
+        "category": "Code AI"
+      },
+      {
+        "command": "codeai.quickScore",
+        "title": "Quick Score",
+        "category": "Code AI"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "submenu": "codeai.submenu",
+          "group": "codeai"
+        }
+      ],
+      "codeai.submenu": [
+        {
+          "command": "codeai.aiReview"
+        },
+        {
+          "command": "codeai.quickScore"
+        }
+      ]
+    },
+    "submenus": [
+      {
+        "id": "codeai.submenu",
+        "label": "Code AI"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "codeai.aiReview",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "editorTextFocus && editorLangId == java"
+      },
+      {
+        "command": "codeai.quickScore",
+        "key": "ctrl+alt+s",
+        "mac": "cmd+alt+s",
+        "when": "editorTextFocus && editorLangId == java"
+      }
+    ],
+    "configuration": {
+      "title": "Code AI Review",
+      "properties": {
+        "codeai.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "Code AI 서버 URL"
+        },
+        "codeai.showInlineHints": {
+          "type": "boolean",
+          "default": true,
+          "description": "인라인 힌트 표시 여부"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}

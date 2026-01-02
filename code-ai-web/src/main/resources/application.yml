@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: code-ai-web
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# Code AI 설정
+codeai:
+  llm:
+    default-provider: claude
+    timeout: 60000
+  analysis:
+    max-file-size: 1048576  # 1MB
+    supported-extensions:
+      - .java
+      - .kt
+      - .scala

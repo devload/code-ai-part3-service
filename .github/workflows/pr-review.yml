@@ -1,0 +1,269 @@
+name: PR Review
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  JAVA_VERSION: '17'
+
+jobs:
+  auto-label:
+    name: Auto Label
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Label PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            const labels = new Set();
+
+            for (const file of files) {
+              const path = file.filename;
+
+              // Module labels
+              if (path.startsWith('code-ai-analyzer/')) labels.add('analyzer');
+              if (path.startsWith('code-ai-intellij/')) labels.add('intellij-plugin');
+              if (path.startsWith('code-ai-vscode/')) labels.add('vscode-extension');
+              if (path.startsWith('mini-ai-cli/')) labels.add('cli');
+              if (path.startsWith('mini-ai-server/')) labels.add('server');
+              if (path.startsWith('docs/')) labels.add('documentation');
+
+              // Type labels
+              if (path.endsWith('.java')) labels.add('java');
+              if (path.endsWith('.ts')) labels.add('typescript');
+              if (path.endsWith('.md')) labels.add('docs');
+              if (path.includes('test')) labels.add('tests');
+            }
+
+            // Size labels
+            const additions = files.reduce((sum, f) => sum + f.additions, 0);
+            const deletions = files.reduce((sum, f) => sum + f.deletions, 0);
+            const totalChanges = additions + deletions;
+
+            if (totalChanges < 10) labels.add('size/XS');
+            else if (totalChanges < 50) labels.add('size/S');
+            else if (totalChanges < 200) labels.add('size/M');
+            else if (totalChanges < 500) labels.add('size/L');
+            else labels.add('size/XL');
+
+            if (labels.size > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: Array.from(labels)
+              });
+            }
+
+  pr-stats:
+    name: PR Statistics
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate PR Stats
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            const { data: commits } = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            // Calculate stats
+            const javaFiles = files.filter(f => f.filename.endsWith('.java'));
+            const additions = files.reduce((sum, f) => sum + f.additions, 0);
+            const deletions = files.reduce((sum, f) => sum + f.deletions, 0);
+
+            let body = `## 📊 PR Statistics\n\n`;
+            body += `| Metric | Value |\n`;
+            body += `|--------|-------|\n`;
+            body += `| Files Changed | ${files.length} |\n`;
+            body += `| Java Files | ${javaFiles.length} |\n`;
+            body += `| Lines Added | +${additions} |\n`;
+            body += `| Lines Removed | -${deletions} |\n`;
+            body += `| Net Change | ${additions - deletions > 0 ? '+' : ''}${additions - deletions} |\n`;
+            body += `| Commits | ${commits.length} |\n`;
+
+            // Add file breakdown
+            if (files.length <= 10) {
+              body += `\n### Changed Files\n`;
+              for (const file of files) {
+                const icon = file.status === 'added' ? '🆕' :
+                            file.status === 'removed' ? '🗑️' :
+                            file.status === 'renamed' ? '📝' : '✏️';
+                body += `- ${icon} \`${file.filename}\` (+${file.additions}/-${file.deletions})\n`;
+              }
+            }
+
+            // Post or update comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const botComment = comments.data.find(c =>
+              c.user.type === 'Bot' && c.body.includes('PR Statistics')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  ai-review-comment:
+    name: AI Review Comment
+    runs-on: ubuntu-latest
+    if: github.event.action == 'opened' || github.event.action == 'synchronize'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build CLI
+        run: ./gradlew :mini-ai-cli:installDist --no-daemon
+
+      - name: Get Changed Java Files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: |
+            **/*.java
+
+      - name: Run AI Review
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: ai-review
+        run: |
+          CLI="./mini-ai-cli/build/install/mini-ai-cli/bin/mini-ai-cli"
+
+          REVIEW_BODY="## 🤖 AI Code Review\n\n"
+
+          TOTAL_SCORE=0
+          FILE_COUNT=0
+
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            if [ -f "$file" ]; then
+              REVIEW_OUTPUT=$($CLI ai-review "$file" --json 2>/dev/null || echo '{"parseSuccess":false}')
+
+              if echo "$REVIEW_OUTPUT" | jq -e '.parseSuccess == true' > /dev/null 2>&1; then
+                GRADE=$(echo "$REVIEW_OUTPUT" | jq -r '.grade')
+                SCORE=$(echo "$REVIEW_OUTPUT" | jq -r '.overallScore')
+
+                case $GRADE in
+                  A) EMOJI="🌟" ;;
+                  B) EMOJI="👍" ;;
+                  C) EMOJI="👌" ;;
+                  D) EMOJI="⚠️" ;;
+                  *) EMOJI="❌" ;;
+                esac
+
+                REVIEW_BODY+="### $EMOJI \`$file\` - Grade: $GRADE ($SCORE/100)\n\n"
+
+                # Add top issues
+                ISSUES=$(echo "$REVIEW_OUTPUT" | jq -r '.comments[:3][] | "- **Line \(.line):** \(.message)"' 2>/dev/null)
+                if [ -n "$ISSUES" ]; then
+                  REVIEW_BODY+="$ISSUES\n\n"
+                fi
+
+                TOTAL_SCORE=$((TOTAL_SCORE + SCORE))
+                FILE_COUNT=$((FILE_COUNT + 1))
+              fi
+            fi
+          done
+
+          if [ $FILE_COUNT -gt 0 ]; then
+            AVG_SCORE=$((TOTAL_SCORE / FILE_COUNT))
+            REVIEW_BODY+="\n---\n**Average Score:** $AVG_SCORE/100 across $FILE_COUNT files\n"
+          fi
+
+          echo "review_body<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$REVIEW_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post Review Comment
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `${{ steps.ai-review.outputs.review_body }}`;
+
+            if (body && body.trim()) {
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number
+              });
+
+              const botComment = comments.find(c =>
+                c.user.type === 'Bot' && c.body.includes('AI Code Review')
+              );
+
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: body
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: body
+                });
+              }
+            }

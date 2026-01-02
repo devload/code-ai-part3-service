@@ -10,6 +10,7 @@ application {
 
 dependencies {
     implementation project(':mini-ai-core')
+    implementation project(':code-ai-analyzer')
 
     // CLI 프레임워크
     implementation 'info.picocli:picocli:4.7.5'

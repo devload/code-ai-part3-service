@@ -1,0 +1,49 @@
+plugins {
+    id 'java'
+    id 'org.jetbrains.intellij' version '1.17.2'
+}
+
+group = 'com.codeai'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // code-ai-analyzer 모듈 의존성
+    implementation project(':code-ai-analyzer')
+}
+
+intellij {
+    version = '2024.1'  // IntelliJ IDEA 버전
+    type = 'IC'          // Community Edition
+    plugins = ['java']   // Java 플러그인 의존성
+    updateSinceUntilBuild = false
+}
+
+tasks {
+    patchPluginXml {
+        version = project.version
+        sinceBuild = '241'
+        untilBuild = '251.*'
+
+        changeNotes = """
+            <h2>1.0.0</h2>
+            <ul>
+                <li>AI 코드 리뷰 기능 추가</li>
+                <li>AST 기반 분석 지원</li>
+                <li>코드 품질 점수 표시</li>
+            </ul>
+        """
+    }
+
+    buildSearchableOptions {
+        enabled = false
+    }
+}

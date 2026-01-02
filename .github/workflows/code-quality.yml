@@ -1,0 +1,211 @@
+name: Code Quality
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**.java'
+      - 'build.gradle'
+      - 'settings.gradle'
+
+env:
+  JAVA_VERSION: '17'
+
+jobs:
+  ai-code-review:
+    name: AI Code Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build CLI
+        run: ./gradlew :mini-ai-cli:installDist --no-daemon
+
+      - name: Get Changed Files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: |
+            **/*.java
+
+      - name: Run AI Review on Changed Files
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo "## 🤖 AI Code Review Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          CLI="./mini-ai-cli/build/install/mini-ai-cli/bin/mini-ai-cli"
+
+          TOTAL_SCORE=0
+          FILE_COUNT=0
+          CRITICAL_COUNT=0
+          ISSUE_COUNT=0
+
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            if [ -f "$file" ]; then
+              echo "### 📄 $file" >> $GITHUB_STEP_SUMMARY
+
+              # Run AI review and capture output
+              REVIEW_OUTPUT=$($CLI ai-review "$file" --json 2>/dev/null || echo '{"parseSuccess":false}')
+
+              if echo "$REVIEW_OUTPUT" | jq -e '.parseSuccess == true' > /dev/null 2>&1; then
+                GRADE=$(echo "$REVIEW_OUTPUT" | jq -r '.grade')
+                SCORE=$(echo "$REVIEW_OUTPUT" | jq -r '.overallScore')
+                COMMENTS=$(echo "$REVIEW_OUTPUT" | jq -r '.commentCount')
+
+                TOTAL_SCORE=$((TOTAL_SCORE + SCORE))
+                FILE_COUNT=$((FILE_COUNT + 1))
+
+                # Grade emoji
+                case $GRADE in
+                  A) EMOJI="🌟" ;;
+                  B) EMOJI="👍" ;;
+                  C) EMOJI="👌" ;;
+                  D) EMOJI="⚠️" ;;
+                  *) EMOJI="❌" ;;
+                esac
+
+                echo "" >> $GITHUB_STEP_SUMMARY
+                echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+                echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+                echo "| Grade | $EMOJI $GRADE |" >> $GITHUB_STEP_SUMMARY
+                echo "| Score | $SCORE/100 |" >> $GITHUB_STEP_SUMMARY
+                echo "| Comments | $COMMENTS |" >> $GITHUB_STEP_SUMMARY
+                echo "" >> $GITHUB_STEP_SUMMARY
+
+                # Show critical issues
+                CRITICALS=$(echo "$REVIEW_OUTPUT" | jq -r '.comments[] | select(.type == "CRITICAL") | "- Line \(.line): \(.message)"')
+                if [ -n "$CRITICALS" ]; then
+                  echo "**🚨 Critical Issues:**" >> $GITHUB_STEP_SUMMARY
+                  echo "$CRITICALS" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  CRITICAL_COUNT=$((CRITICAL_COUNT + 1))
+                fi
+
+                # Show issues
+                ISSUES=$(echo "$REVIEW_OUTPUT" | jq -r '.comments[] | select(.type == "ISSUE") | "- Line \(.line): \(.message)"')
+                if [ -n "$ISSUES" ]; then
+                  echo "**⚠️ Issues:**" >> $GITHUB_STEP_SUMMARY
+                  echo "$ISSUES" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  ISSUE_COUNT=$((ISSUE_COUNT + 1))
+                fi
+
+              else
+                echo "⚠️ Could not analyze this file" >> $GITHUB_STEP_SUMMARY
+              fi
+
+              echo "---" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          # Summary
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Summary" >> $GITHUB_STEP_SUMMARY
+
+          if [ $FILE_COUNT -gt 0 ]; then
+            AVG_SCORE=$((TOTAL_SCORE / FILE_COUNT))
+            echo "- **Files Analyzed:** $FILE_COUNT" >> $GITHUB_STEP_SUMMARY
+            echo "- **Average Score:** $AVG_SCORE/100" >> $GITHUB_STEP_SUMMARY
+            echo "- **Critical Issues:** $CRITICAL_COUNT" >> $GITHUB_STEP_SUMMARY
+            echo "- **Issues:** $ISSUE_COUNT" >> $GITHUB_STEP_SUMMARY
+
+            # Fail if critical issues found
+            if [ $CRITICAL_COUNT -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "❌ **Build failed due to critical issues**" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          else
+            echo "No Java files to analyze" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  checkstyle:
+    name: Code Style Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Check Code Style
+        run: |
+          echo "## 📝 Code Style Report" >> $GITHUB_STEP_SUMMARY
+
+          # Check for common style issues
+          echo "### Trailing Whitespace" >> $GITHUB_STEP_SUMMARY
+          TRAILING=$(grep -rn --include="*.java" " $" . --exclude-dir=build --exclude-dir=.gradle 2>/dev/null | wc -l || echo "0")
+          if [ "$TRAILING" -gt 0 ]; then
+            echo "⚠️ Found $TRAILING lines with trailing whitespace" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No trailing whitespace" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "### Tab Characters" >> $GITHUB_STEP_SUMMARY
+          TABS=$(grep -rn --include="*.java" "	" . --exclude-dir=build --exclude-dir=.gradle 2>/dev/null | wc -l || echo "0")
+          if [ "$TABS" -gt 0 ]; then
+            echo "⚠️ Found $TABS lines with tab characters (use spaces)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No tab characters" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "### Long Lines (>120 chars)" >> $GITHUB_STEP_SUMMARY
+          LONG_LINES=$(find . -name "*.java" -not -path "*/build/*" -not -path "*/.gradle/*" -exec awk 'length > 120 {count++} END {print count+0}' {} + 2>/dev/null | awk '{s+=$1} END {print s+0}')
+          if [ "$LONG_LINES" -gt 0 ]; then
+            echo "⚠️ Found $LONG_LINES lines exceeding 120 characters" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All lines within 120 characters" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  complexity-check:
+    name: Complexity Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Analyze Complexity
+        run: |
+          echo "## 🔍 Complexity Analysis" >> $GITHUB_STEP_SUMMARY
+
+          # Count methods per class
+          echo "### Methods per Class" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          find . -name "*.java" -not -path "*/build/*" -not -path "*/.gradle/*" -exec basename {} .java \; -exec grep -c "^\s*\(public\|private\|protected\)\s.*(.*).*{" {} \; 2>/dev/null | paste - - | sort -t$'\t' -k2 -nr | head -10 >> $GITHUB_STEP_SUMMARY || true
+
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Count lines per file
+          echo "### Largest Files (by lines)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          find . -name "*.java" -not -path "*/build/*" -not -path "*/.gradle/*" -exec wc -l {} \; 2>/dev/null | sort -nr | head -10 >> $GITHUB_STEP_SUMMARY || true
+
+          echo '```' >> $GITHUB_STEP_SUMMARY

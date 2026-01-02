@@ -1,0 +1,163 @@
+name: Plugin Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'code-ai-intellij/**'
+      - 'code-ai-vscode/**'
+      - 'code-ai-analyzer/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'code-ai-intellij/**'
+      - 'code-ai-vscode/**'
+  release:
+    types: [ published ]
+
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '20'
+
+jobs:
+  build-intellij-plugin:
+    name: Build IntelliJ Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build Plugin
+        run: ./gradlew :code-ai-intellij:buildPlugin --no-daemon
+
+      - name: Verify Plugin
+        run: ./gradlew :code-ai-intellij:verifyPlugin --no-daemon
+
+      - name: Upload Plugin Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: intellij-plugin
+          path: code-ai-intellij/build/distributions/*.zip
+          retention-days: 30
+
+      - name: Plugin Build Summary
+        run: |
+          echo "## 🔌 IntelliJ Plugin Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          PLUGIN_FILE=$(ls code-ai-intellij/build/distributions/*.zip 2>/dev/null | head -1)
+          if [ -n "$PLUGIN_FILE" ]; then
+            PLUGIN_SIZE=$(du -h "$PLUGIN_FILE" | cut -f1)
+            echo "✅ **Build Successful**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| File | $(basename $PLUGIN_FILE) |" >> $GITHUB_STEP_SUMMARY
+            echo "| Size | $PLUGIN_SIZE |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Build Failed**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  build-vscode-extension:
+    name: Build VS Code Extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: code-ai-vscode/package.json
+
+      - name: Install Dependencies
+        working-directory: code-ai-vscode
+        run: npm ci || npm install
+
+      - name: Compile
+        working-directory: code-ai-vscode
+        run: npm run compile
+
+      - name: Lint
+        working-directory: code-ai-vscode
+        run: npm run lint || true
+
+      - name: Package Extension
+        working-directory: code-ai-vscode
+        run: |
+          npm install -g @vscode/vsce
+          vsce package --no-dependencies || echo "VSIX packaging skipped"
+
+      - name: Upload Extension Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vscode-extension
+          path: code-ai-vscode/*.vsix
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Extension Build Summary
+        run: |
+          echo "## 📦 VS Code Extension Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          VSIX_FILE=$(ls code-ai-vscode/*.vsix 2>/dev/null | head -1)
+          if [ -n "$VSIX_FILE" ]; then
+            VSIX_SIZE=$(du -h "$VSIX_FILE" | cut -f1)
+            echo "✅ **Build Successful**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| File | $(basename $VSIX_FILE) |" >> $GITHUB_STEP_SUMMARY
+            echo "| Size | $VSIX_SIZE |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **VSIX not created** (compile only)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  release-plugins:
+    name: Release Plugins
+    runs-on: ubuntu-latest
+    needs: [ build-intellij-plugin, build-vscode-extension ]
+    if: github.event_name == 'release'
+
+    steps:
+      - name: Download IntelliJ Plugin
+        uses: actions/download-artifact@v4
+        with:
+          name: intellij-plugin
+          path: ./artifacts/intellij
+
+      - name: Download VS Code Extension
+        uses: actions/download-artifact@v4
+        with:
+          name: vscode-extension
+          path: ./artifacts/vscode
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./artifacts/intellij/*.zip
+            ./artifacts/vscode/*.vsix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        run: |
+          echo "## 🚀 Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Release ${{ github.event.release.tag_name }} has been published with plugins." >> $GITHUB_STEP_SUMMARY

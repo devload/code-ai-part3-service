@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code AI - Analyze</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1f2937;
+            --light: #f3f4f6;
+            --gray: #6b7280;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f9fafb;
+            color: var(--dark);
+        }
+        .container { display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px;
+            background: var(--dark);
+            color: white;
+            padding: 20px;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 24px;
+        }
+        .logo h1 { font-size: 20px; }
+        .nav-link {
+            display: block;
+            padding: 12px 16px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 4px;
+        }
+        .nav-link:hover, .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        /* Main */
+        .main { flex: 1; padding: 24px; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        .header h2 { font-size: 24px; }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--light);
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--gray);
+            border-radius: 12px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+        .drop-zone svg {
+            width: 64px;
+            height: 64px;
+            color: var(--gray);
+            margin-bottom: 16px;
+        }
+        .drop-zone h3 { margin-bottom: 8px; }
+        .drop-zone p { color: var(--gray); font-size: 14px; }
+
+        /* Code Editor */
+        .code-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .code-editor {
+            width: 100%;
+            min-height: 400px;
+            padding: 16px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            border-radius: 8px;
+            resize: vertical;
+        }
+        .code-label {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Options */
+        .options {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .option-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .option-group label { font-size: 14px; }
+        select {
+            padding: 8px 12px;
+            border: 1px solid var(--light);
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #4f46e5; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-secondary { background: var(--light); color: var(--dark); }
+        .btn-danger { background: var(--danger); color: white; }
+
+        .actions { display: flex; gap: 8px; margin-top: 16px; }
+
+        /* Result Summary */
+        .result-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .summary-item {
+            background: var(--light);
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .summary-value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .summary-label {
+            font-size: 12px;
+            color: var(--gray);
+            margin-top: 4px;
+        }
+
+        /* Issues */
+        .issue-list { list-style: none; }
+        .issue-item {
+            display: flex;
+            gap: 12px;
+            padding: 16px;
+            border-bottom: 1px solid var(--light);
+        }
+        .issue-item:last-child { border: none; }
+        .issue-severity {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-top: 5px;
+        }
+        .issue-severity.critical { background: var(--danger); }
+        .issue-severity.warning { background: var(--warning); }
+        .issue-severity.info { background: var(--primary); }
+        .issue-content { flex: 1; }
+        .issue-title { font-weight: 500; margin-bottom: 4px; }
+        .issue-meta { font-size: 12px; color: var(--gray); }
+        .issue-fix {
+            margin-top: 8px;
+            padding: 10px;
+            background: #f0fdf4;
+            border-left: 3px solid var(--success);
+            font-size: 13px;
+        }
+
+        /* Badge */
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .badge-success { background: rgba(16,185,129,0.1); color: var(--success); }
+        .badge-warning { background: rgba(245,158,11,0.1); color: var(--warning); }
+        .badge-danger { background: rgba(239,68,68,0.1); color: var(--danger); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--light);
+            margin-bottom: 16px;
+        }
+        .tab {
+            padding: 12px 20px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            color: var(--gray);
+            cursor: pointer;
+            position: relative;
+        }
+        .tab.active {
+            color: var(--primary);
+        }
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Hidden */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                <h1>Code AI</h1>
+            </div>
+            <nav>
+                <a href="dashboard.html" class="nav-link">Dashboard</a>
+                <a href="analyze.html" class="nav-link active">Analyze</a>
+                <a href="history.html" class="nav-link">History</a>
+                <a href="settings.html" class="nav-link">Settings</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            <header class="header">
+                <h2>Code Analysis</h2>
+                <div>
+                    <span class="badge badge-success" id="status">Ready</span>
+                </div>
+            </header>
+
+            <!-- File Upload -->
+            <div class="card" id="uploadSection">
+                <div class="drop-zone" id="dropZone">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                    </svg>
+                    <h3>Drop your file here</h3>
+                    <p>Supports .java, .kt, .scala files (max 1MB)</p>
+                    <input type="file" id="fileInput" accept=".java,.kt,.scala" style="display:none">
+                </div>
+            </div>
+
+            <!-- Analysis Options -->
+            <div class="card">
+                <div class="card-title">Analysis Options</div>
+                <div class="options">
+                    <div class="option-group">
+                        <input type="checkbox" id="optAST" checked>
+                        <label for="optAST">AST Analysis</label>
+                    </div>
+                    <div class="option-group">
+                        <input type="checkbox" id="optLLM">
+                        <label for="optLLM">LLM Review</label>
+                    </div>
+                    <div class="option-group">
+                        <label>Provider:</label>
+                        <select id="llmProvider">
+                            <option value="codeai">Code AI (Our Model)</option>
+                            <option value="claude">Claude</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="ollama">Ollama (Local)</option>
+                        </select>
+                    </div>
+                    <div class="option-group">
+                        <input type="checkbox" id="optAutoFix">
+                        <label for="optAutoFix">Auto Fix</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Code Editor -->
+            <div class="card">
+                <div class="card-title">Code Editor</div>
+                <div class="code-container">
+                    <div>
+                        <div class="code-label">
+                            <span>Original Code</span>
+                            <span id="fileName">example.java</span>
+                        </div>
+                        <textarea id="codeInput" class="code-editor" placeholder="// Paste your code here...">public class UserService {
+
+    public User findUser(String id) {
+        System.out.println("Finding user: " + id);
+
+        try {
+            User user = database.query("SELECT * FROM users WHERE id = " + id);
+            return user;
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+
+        if (id == null)
+            return null;
+
+        return null;
+    }
+
+    public void processData(List data) {
+        for (int i = 0; i < 100; i++) {
+            String result = "";
+            for (Object item : data) {
+                result = result + item.toString();
+            }
+        }
+    }
+}</textarea>
+                    </div>
+                    <div id="fixedCodeSection" class="hidden">
+                        <div class="code-label">
+                            <span>Fixed Code</span>
+                            <button class="btn btn-success" onclick="applyFix()" style="padding: 4px 12px; font-size: 12px;">Apply</button>
+                        </div>
+                        <textarea id="codeFixed" class="code-editor" readonly></textarea>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-primary" onclick="analyzeCode()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                        </svg>
+                        Analyze
+                    </button>
+                    <button class="btn btn-success" onclick="autoFixCode()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29c-.39-.39-1.02-.39-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z"/>
+                        </svg>
+                        Auto Fix
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearCode()">Clear</button>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div class="card" id="resultsSection">
+                <div class="card-title">Analysis Results</div>
+
+                <!-- Summary -->
+                <div class="result-summary">
+                    <div class="summary-item">
+                        <div class="summary-value" id="resScore">-</div>
+                        <div class="summary-label">Score</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="resGrade">-</div>
+                        <div class="summary-label">Grade</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="resIssues">-</div>
+                        <div class="summary-label">Issues</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" id="resFixed">-</div>
+                        <div class="summary-label">Fixed</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab('issues')">Issues</button>
+                    <button class="tab" onclick="showTab('suggestions')">Suggestions</button>
+                    <button class="tab" onclick="showTab('positives')">Positives</button>
+                </div>
+
+                <!-- Issue List -->
+                <div id="issuesTab" class="tab-content active">
+                    <ul class="issue-list" id="issueList">
+                        <li class="issue-item">
+                            <div class="issue-severity warning"></div>
+                            <div class="issue-content">
+                                <div class="issue-title">Run analysis to see issues</div>
+                                <div class="issue-meta">Click the Analyze button above</div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div id="suggestionsTab" class="tab-content">
+                    <ul class="issue-list" id="suggestionList"></ul>
+                </div>
+
+                <div id="positivesTab" class="tab-content">
+                    <ul class="issue-list" id="positiveList"></ul>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // File drag & drop
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        function handleFile(file) {
+            if (!file) return;
+            document.getElementById('fileName').textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('codeInput').value = e.target.result;
+            };
+            reader.readAsText(file);
+        }
+
+        // Tab switching
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+        }
+
+        // Analysis
+        function analyzeCode() {
+            const code = document.getElementById('codeInput').value;
+            const lines = code.split('\n');
+            const issues = [];
+            const suggestions = [];
+            const positives = [];
+
+            document.getElementById('status').textContent = 'Analyzing...';
+            document.getElementById('status').className = 'badge badge-warning';
+
+            // Simulate analysis delay
+            setTimeout(() => {
+                // Detect issues
+                lines.forEach((line, i) => {
+                    const lineNum = i + 1;
+
+                    if (line.includes('System.out.println')) {
+                        issues.push({
+                            type: 'warning',
+                            title: 'Use Logger instead of System.out',
+                            line: lineNum,
+                            code: 'SYSTEM_OUT',
+                            fix: 'logger.info(...)'
+                        });
+                    }
+
+                    if (line.match(/catch\s*\([^)]+\)\s*\{/) && lines[i+1]?.includes('TODO')) {
+                        issues.push({
+                            type: 'critical',
+                            title: 'Empty catch block with TODO',
+                            line: lineNum,
+                            code: 'EMPTY_CATCH',
+                            fix: 'logger.error("Error occurred", e);'
+                        });
+                    }
+
+                    if (line.includes('SELECT') && line.includes('+')) {
+                        issues.push({
+                            type: 'critical',
+                            title: 'SQL Injection vulnerability',
+                            line: lineNum,
+                            code: 'SQL_INJECTION',
+                            fix: 'Use PreparedStatement with parameterized queries'
+                        });
+                    }
+
+                    if (line.match(/if\s*\([^)]+\)\s*$/) && lines[i+1]?.trim().startsWith('return')) {
+                        issues.push({
+                            type: 'info',
+                            title: 'Missing braces in if statement',
+                            line: lineNum,
+                            code: 'MISSING_BRACES',
+                            fix: 'if (condition) { return value; }'
+                        });
+                    }
+
+                    if (line.includes('List data') || line.includes('List<>')) {
+                        issues.push({
+                            type: 'warning',
+                            title: 'Raw type usage',
+                            line: lineNum,
+                            code: 'RAW_TYPE',
+                            fix: 'List<Object> data'
+                        });
+                    }
+
+                    if (line.includes('result = result +') || line.includes('result +=')) {
+                        issues.push({
+                            type: 'warning',
+                            title: 'String concatenation in loop',
+                            line: lineNum,
+                            code: 'STRING_CONCAT_LOOP',
+                            fix: 'Use StringBuilder instead'
+                        });
+                    }
+                });
+
+                // Add suggestions
+                suggestions.push({
+                    type: 'info',
+                    title: 'Consider using Optional for null handling',
+                    line: 0,
+                    code: 'SUGGESTION'
+                });
+                suggestions.push({
+                    type: 'info',
+                    title: 'Add Javadoc comments for public methods',
+                    line: 0,
+                    code: 'SUGGESTION'
+                });
+
+                // Add positives
+                if (code.includes('public class')) {
+                    positives.push({
+                        type: 'success',
+                        title: 'Class is properly defined',
+                        line: 0,
+                        code: 'GOOD'
+                    });
+                }
+                if (code.includes('try')) {
+                    positives.push({
+                        type: 'success',
+                        title: 'Exception handling is present',
+                        line: 0,
+                        code: 'GOOD'
+                    });
+                }
+
+                // Calculate score
+                const penalty = issues.reduce((sum, i) =>
+                    sum + (i.type === 'critical' ? 15 : i.type === 'warning' ? 8 : 3), 0);
+                const score = Math.max(0, 100 - penalty);
+                const grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+
+                // Update UI
+                document.getElementById('resScore').textContent = score;
+                document.getElementById('resGrade').textContent = grade;
+                document.getElementById('resIssues').textContent = issues.length;
+                document.getElementById('resFixed').textContent = '0';
+
+                renderIssues('issueList', issues);
+                renderIssues('suggestionList', suggestions);
+                renderIssues('positiveList', positives);
+
+                document.getElementById('status').textContent = 'Complete';
+                document.getElementById('status').className = 'badge badge-success';
+
+                // Store for auto-fix
+                window.currentIssues = issues;
+            }, 500);
+        }
+
+        function renderIssues(containerId, items) {
+            const container = document.getElementById(containerId);
+            if (items.length === 0) {
+                container.innerHTML = '<li class="issue-item"><div class="issue-content">No items found</div></li>';
+                return;
+            }
+            container.innerHTML = items.map(item => `
+                <li class="issue-item">
+                    <div class="issue-severity ${item.type}"></div>
+                    <div class="issue-content">
+                        <div class="issue-title">${item.title}</div>
+                        <div class="issue-meta">${item.code}${item.line ? ' - Line ' + item.line : ''}</div>
+                        ${item.fix ? `<div class="issue-fix">💡 ${item.fix}</div>` : ''}
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        function autoFixCode() {
+            let code = document.getElementById('codeInput').value;
+            let fixCount = 0;
+
+            // Apply fixes
+            if (code.includes('System.out.println')) {
+                code = code.replace(/System\.out\.println\((.*?)\);/g, 'logger.info($1);');
+                fixCount++;
+            }
+
+            if (code.match(/catch\s*\(\w+\s+\w+\)\s*\{\s*\n\s*\/\/ TODO/)) {
+                code = code.replace(
+                    /catch\s*\((\w+)\s+(\w+)\)\s*\{\s*\n\s*\/\/ TODO[^\n]*/g,
+                    'catch ($1 $2) {\n            logger.error("Error occurred", $2);'
+                );
+                fixCount++;
+            }
+
+            if (code.includes('if (id == null)') && code.includes('return null;')) {
+                code = code.replace(
+                    /if \(id == null\)\s*\n\s*return null;/g,
+                    'if (id == null) {\n            return null;\n        }'
+                );
+                fixCount++;
+            }
+
+            code = code.replace(/List data/g, 'List<Object> data');
+            if (code.includes('List<Object>')) fixCount++;
+
+            // Show fixed code
+            document.getElementById('fixedCodeSection').classList.remove('hidden');
+            document.getElementById('codeFixed').value = code;
+            document.getElementById('resFixed').textContent = fixCount;
+        }
+
+        function applyFix() {
+            const fixedCode = document.getElementById('codeFixed').value;
+            document.getElementById('codeInput').value = fixedCode;
+            document.getElementById('fixedCodeSection').classList.add('hidden');
+            analyzeCode();
+        }
+
+        function clearCode() {
+            document.getElementById('codeInput').value = '';
+            document.getElementById('codeFixed').value = '';
+            document.getElementById('fixedCodeSection').classList.add('hidden');
+            document.getElementById('resScore').textContent = '-';
+            document.getElementById('resGrade').textContent = '-';
+            document.getElementById('resIssues').textContent = '-';
+            document.getElementById('resFixed').textContent = '-';
+        }
+    </script>
+</body>
+</html>
