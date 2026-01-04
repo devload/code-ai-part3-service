@@ -17,37 +17,37 @@
         │
         ▼
 ┌─────────────────────────────────────────────────────────┐
-│ STEP 13: API 호출 (API Calling)                         │
+│ STEP 15: API 호출 (API Calling)                         │
 │ 요청 구성 → HTTP 전송 → 응답 수신                        │
 └─────────────────────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────────────────────┐
-│ STEP 14: 프롬프트 구성 (Prompt Engineering)             │
+│ STEP 16: 프롬프트 구성 (Prompt Engineering)             │
 │ System Prompt + Context + Task + Output Format          │
 └─────────────────────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────────────────────┐
-│ STEP 15: LLM 처리 (LLM Processing)                      │
+│ STEP 17: LLM 처리 (LLM Processing)                      │
 │ 모델 선택 → 비용/성능 최적화 → 라우팅                    │
 └─────────────────────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────────────────────┐
-│ STEP 16: 응답 파싱 (Response Parsing)                   │
+│ STEP 18: 응답 파싱 (Response Parsing)                   │
 │ JSON/Markdown → 구조화된 데이터 → 이슈 목록              │
 └─────────────────────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────────────────────┐
-│ STEP 17: 액션 실행 (Action Execution)                   │
+│ STEP 19: 액션 실행 (Action Execution)                   │
 │ 코드 수정 → 리팩토링 → 파일 변경                         │
 └─────────────────────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────────────────────┐
-│ STEP 18: 피드백 루프 (Feedback Loop)                    │
+│ STEP 20: 피드백 루프 (Feedback Loop)                    │
 │ 검증 → 학습 → 재시도 전략 → 지속적 개선                  │
 └─────────────────────────────────────────────────────────┘
         │
@@ -57,16 +57,16 @@
 
 ---
 
-## 학습 단계 (STEP 13-18)
+## 학습 단계 (STEP 15-20)
 
 | STEP | 제목 | 핵심 질문 | 실행 명령 |
 |------|------|----------|----------|
-| 13 | API 호출 | LLM API는 어떻게 사용하는가? | `./gradlew :step13-api:run` |
-| 14 | 프롬프트 구성 | 좋은 프롬프트는 어떻게 만드는가? | `./gradlew :step14-prompt:run` |
-| 15 | LLM 처리 | 어떤 모델을 언제 쓰는가? | `./gradlew :step15-llm:run` |
-| 16 | 응답 파싱 | AI 응답을 어떻게 처리하는가? | `./gradlew :step16-response:run` |
-| 17 | 액션 실행 | AI가 도구를 어떻게 사용하는가? | `./gradlew :step17-action:run` |
-| 18 | 피드백 루프 | 결과를 어떻게 개선하는가? | `./gradlew :step18-feedback:run` |
+| 15 | API 호출 | LLM API는 어떻게 사용하는가? | `./gradlew :step15-api:run` |
+| 16 | 프롬프트 구성 | 좋은 프롬프트는 어떻게 만드는가? | `./gradlew :step16-prompt:run` |
+| 17 | LLM 처리 | 어떤 모델을 언제 쓰는가? | `./gradlew :step17-llm:run` |
+| 18 | 응답 파싱 | AI 응답을 어떻게 처리하는가? | `./gradlew :step18-response:run` |
+| 19 | 액션 실행 | AI가 도구를 어떻게 사용하는가? | `./gradlew :step19-action:run` |
+| 20 | 피드백 루프 | 결과를 어떻게 개선하는가? | `./gradlew :step20-feedback:run` |
 
 ---
 
@@ -79,11 +79,11 @@
 
 ### 데모 실행
 ```bash
-# STEP 14: 프롬프트 구성 데모 (핵심)
-./gradlew :step14-prompt:run
+# STEP 16: 프롬프트 구성 데모 (핵심)
+./gradlew :step16-prompt:run
 
-# STEP 18: 피드백 루프 데모
-./gradlew :step18-feedback:run
+# STEP 20: 피드백 루프 데모
+./gradlew :step20-feedback:run
 
 # 전체 서비스 파이프라인
 ./gradlew :service-pipeline:run
@@ -127,12 +127,12 @@
 
 ```
 code-ai-part3-service/
-├── step13-api/                # API 호출
-├── step14-prompt/             # 프롬프트 구성
-├── step15-llm/                # LLM 처리
-├── step16-response/           # 응답 파싱
-├── step17-action/             # 액션 실행
-├── step18-feedback/           # 피드백 루프
+├── step15-api/                # API 호출
+├── step16-prompt/             # 프롬프트 구성
+├── step17-llm/                # LLM 처리
+├── step18-response/           # 응답 파싱
+├── step19-action/             # 액션 실행
+├── step20-feedback/           # 피드백 루프
 ├── service-pipeline/          # 서비스 파이프라인
 └── docs/                      # 학습 문서
 ```
@@ -266,4 +266,4 @@ MIT License
 
 ---
 
-**Version**: 3.0.0 | **STEP**: 13-18 | **Focus**: AI Service Process
+**Version**: 3.0.0 | **STEP**: 15-20 | **Focus**: AI Service Process

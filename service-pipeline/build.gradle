@@ -4,12 +4,12 @@ plugins {
 }
 
 dependencies {
-    implementation project(':step13-api')
-    implementation project(':step14-prompt')
-    implementation project(':step15-llm')
-    implementation project(':step16-response')
-    implementation project(':step17-action')
-    implementation project(':step18-feedback')
+    implementation project(':step15-api')
+    implementation project(':step16-prompt')
+    implementation project(':step17-llm')
+    implementation project(':step18-response')
+    implementation project(':step19-action')
+    implementation project(':step20-feedback')
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }

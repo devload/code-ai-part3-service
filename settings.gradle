@@ -12,11 +12,11 @@ include 'code-ai-intellij'
 include 'code-ai-vscode'
 include 'code-ai-web'
 
-// 새로운 AI Process 단계별 모듈 (AI 서비스)
-include 'step13-api'
-include 'step14-prompt'
-include 'step15-llm'
-include 'step16-response'
-include 'step17-action'
-include 'step18-feedback'
+// AI Process 단계별 모듈 (STEP 15-20: AI 서비스)
+include 'step15-api'
+include 'step16-prompt'
+include 'step17-llm'
+include 'step18-response'
+include 'step19-action'
+include 'step20-feedback'
 include 'service-pipeline'
