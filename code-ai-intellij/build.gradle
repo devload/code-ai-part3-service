@@ -28,6 +28,11 @@ intellij {
 }
 
 tasks {
+    // Windows Microsoft JDK 경로 문제 해결
+    instrumentCode {
+        enabled = false
+    }
+
     patchPluginXml {
         version = project.version
         sinceBuild = '241'

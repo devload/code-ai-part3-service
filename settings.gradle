@@ -8,9 +8,9 @@ include 'code-ai-analyzer'
 include 'mini-ai-model-ngram'
 include 'mini-ai-server'
 include 'mini-ai-cli'
-include 'code-ai-intellij'
-include 'code-ai-vscode'
-include 'code-ai-web'
+// include 'code-ai-intellij'  // Windows JDK 경로 문제로 임시 제외
+// include 'code-ai-vscode'    // VS Code 확장 (별도 빌드)
+// include 'code-ai-web'       // 웹 UI (별도 빌드 필요)
 
 // AI Process 단계별 모듈 (STEP 15-20: AI 서비스)
 include 'step15-api'
