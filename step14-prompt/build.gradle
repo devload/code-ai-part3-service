@@ -1,0 +1,16 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+application {
+    mainClass = 'com.aiprocess.step14.PromptDemo'
+}
+
+tasks.named('run') {
+    standardInput = System.in
+}

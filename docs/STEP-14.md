@@ -1,345 +1,342 @@
-# STEP-14: IDE 플러그인
+# STEP 14: AI에게 잘 물어보기 - 프롬프트 구성
 
-## 목표
-IntelliJ IDEA와 VS Code용 플러그인을 개발하여 IDE에서 직접 AI 코드 리뷰를 실행합니다.
+> API 호출은 할 수 있게 됐어요. 근데 뭘 물어보냐에 따라 답이 완전히 달라져요.
+> "코드 봐줘"라고 하면 AI도 뭘 봐야 할지 모르잖아요?
 
-## IntelliJ IDEA 플러그인
+---
 
-### 프로젝트 구조
+## 나쁜 질문 vs 좋은 질문
+
+| 나쁜 질문 | 좋은 질문 |
+|-----------|-----------|
+| "코드 리뷰해줘" | "이 Java 코드를 보안, 성능, 가독성 관점에서 리뷰해주세요" |
+| "버그 찾아줘" | "NullPointerException이 발생할 수 있는 위치를 찾고 수정 방법을 제안해주세요" |
+| "개선해줘" | "이 메서드의 순환 복잡도를 10 이하로 낮추는 리팩토링을 제안해주세요" |
+
+구체적일수록 AI가 정확한 답을 줘요.
+
+---
+
+## 프롬프트의 5가지 구성요소
+
+좋은 프롬프트는 이런 구조를 가져요:
+
 ```
-code-ai-intellij/
-├── build.gradle                    # IntelliJ Plugin Gradle 설정
-└── src/main/
-    ├── java/com/codeai/intellij/
-    │   ├── action/
-    │   │   ├── AIReviewAction.java     # AI 리뷰 액션
-    │   │   ├── ASTReviewAction.java    # AST 리뷰 액션
-    │   │   └── QuickScoreAction.java   # 빠른 점수 확인
-    │   ├── service/
-    │   │   └── CodeAIService.java      # 결과 관리 서비스
-    │   └── toolwindow/
-    │       ├── CodeAIToolWindowFactory.java
-    │       └── CodeAIToolWindowPanel.java
-    └── resources/
-        ├── META-INF/
-        │   └── plugin.xml              # 플러그인 설정
-        └── icons/
-            ├── codeai.svg
-            └── review.svg
-```
-
-### build.gradle
-```gradle
-plugins {
-    id 'java'
-    id 'org.jetbrains.intellij' version '1.17.2'
-}
-
-dependencies {
-    implementation project(':code-ai-analyzer')
-}
-
-intellij {
-    version = '2024.1'
-    type = 'IC'  // Community Edition
-    plugins = ['java']
-}
+┌────────────────────────────────────────────────────────┐
+│ 1. 시스템 프롬프트 (System)                            │
+│    → "넌 10년 경력의 시니어 개발자야"                  │
+├────────────────────────────────────────────────────────┤
+│ 2. 컨텍스트 (Context)                                 │
+│    → "이 Java 코드를 분석해줘: ..."                   │
+├────────────────────────────────────────────────────────┤
+│ 3. 작업 지시 (Task)                                   │
+│    → "보안 취약점을 찾아줘"                           │
+├────────────────────────────────────────────────────────┤
+│ 4. 출력 형식 (Format)                                 │
+│    → "JSON 형식으로 응답해줘"                         │
+├────────────────────────────────────────────────────────┤
+│ 5. 예시 (Examples)                                    │
+│    → "예를 들어 이런 식으로..."                       │
+└────────────────────────────────────────────────────────┘
 ```
 
-### plugin.xml
-```xml
-<idea-plugin>
-    <id>com.codeai.intellij</id>
-    <name>Code AI Review</name>
+---
 
-    <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.modules.java</depends>
+## 실제 프롬프트 만들기
 
-    <extensions defaultExtensionNs="com.intellij">
-        <!-- 서비스 등록 -->
-        <projectService
-            serviceImplementation="com.codeai.intellij.service.CodeAIService"/>
+프롬프트 빌더를 만들어볼게요:
 
-        <!-- Tool Window -->
-        <toolWindow id="Code AI Review"
-                    anchor="bottom"
-                    factoryClass="com.codeai.intellij.toolwindow.CodeAIToolWindowFactory"/>
-
-        <!-- 알림 그룹 -->
-        <notificationGroup id="Code AI Notifications"
-                          displayType="BALLOON"/>
-    </extensions>
-
-    <actions>
-        <group id="CodeAI.ActionGroup" text="Code AI" popup="true">
-            <add-to-group group-id="ToolsMenu"/>
-            <add-to-group group-id="EditorPopupMenu"/>
-
-            <action id="CodeAI.AIReview"
-                    class="com.codeai.intellij.action.AIReviewAction"
-                    text="AI Review">
-                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt R"/>
-            </action>
-        </group>
-    </actions>
-</idea-plugin>
-```
-
-### 주요 기능
-
-#### 1. AI Review Action
 ```java
-public class AIReviewAction extends AnAction {
-    @Override
-    public void actionPerformed(@NotNull AnActionEvent e) {
-        // 백그라운드에서 분석 실행
-        ProgressManager.getInstance().run(
-            new Task.Backgroundable(project, "AI 코드 리뷰 중...", true) {
-                @Override
-                public void run(@NotNull ProgressIndicator indicator) {
-                    AICodeReviewer reviewer = new AICodeReviewer();
-                    result = reviewer.review(code);
-                }
+public class PromptBuilder {
+    private StringBuilder systemPrompt = new StringBuilder();
+    private StringBuilder userPrompt = new StringBuilder();
 
-                @Override
-                public void onSuccess() {
-                    // Tool Window에 결과 표시
-                    showResultInToolWindow(project, fileName, result);
-                }
-            });
+    /**
+     * 역할 부여: "넌 코드 리뷰 전문가야"
+     */
+    public PromptBuilder forCodeReview() {
+        systemPrompt.append("""
+            You are an expert code reviewer with deep knowledge of
+            software engineering best practices.
+
+            Your review should focus on:
+            1. Code Quality - bugs, anti-patterns, code smells
+            2. Security - vulnerabilities, hardcoded secrets
+            3. Performance - inefficient algorithms, memory leaks
+            4. Maintainability - readability, naming
+
+            Guidelines:
+            - Be constructive and educational
+            - Prioritize by severity (CRITICAL > ERROR > WARNING > INFO)
+            - Provide specific line numbers
+            - Include code examples for fixes
+            - Respond in Korean
+            """);
+        return this;
+    }
+
+    /**
+     * 분석할 코드 추가
+     */
+    public PromptBuilder withCode(String code, String filename) {
+        userPrompt.append("\n## 분석할 코드\n\n");
+        userPrompt.append("파일: ").append(filename).append("\n");
+        userPrompt.append("```java\n").append(code).append("\n```\n");
+        return this;
+    }
+
+    /**
+     * 최종 프롬프트 생성
+     */
+    public String build() {
+        return systemPrompt.toString() + "\n\n" + userPrompt.toString();
     }
 }
 ```
 
-#### 2. Quick Score (팝업)
+---
+
+## 사용 예시
+
+이렇게 쓰면:
+
 ```java
-// 에디터 상단에 점수 팝업 표시
-JBPopupFactory.getInstance()
-    .createHtmlTextBalloonBuilder(html, null, bgColor, null)
-    .setFadeoutTime(5000)
-    .createBalloon()
-    .show(RelativePoint.getNorthEastOf(editor.getComponent()),
-          Balloon.Position.above);
+String code = """
+    public class UserService {
+        private String dbPassword = "admin123";
+
+        public User findUser(String userId) {
+            String sql = "SELECT * FROM users WHERE id = '" + userId + "'";
+            return db.query(sql);
+        }
+    }
+    """;
+
+String prompt = new PromptBuilder()
+    .forCodeReview()
+    .withCode(code, "UserService.java")
+    .build();
 ```
 
-#### 3. Tool Window
+이런 프롬프트가 만들어져요:
+
+```
+You are an expert code reviewer with deep knowledge of
+software engineering best practices.
+
+Your review should focus on:
+1. Code Quality - bugs, anti-patterns, code smells
+2. Security - vulnerabilities, hardcoded secrets
+...
+
+## 분석할 코드
+
+파일: UserService.java
 ```java
-public class CodeAIToolWindowPanel extends JPanel {
-    // 점수 바 표시
-    private JPanel createScoreBar(String label, int score) {
-        JProgressBar bar = new JProgressBar(0, 100);
-        bar.setValue(score);
-        bar.setForeground(getScoreColor(score));
-        return panel;
-    }
-
-    // 코멘트 패널
-    private JPanel createCommentPanel(ReviewComment comment) {
-        // 타입별 색상 구분
-        panel.setBorder(BorderFactory.createMatteBorder(
-            0, 3, 0, 0, getTypeColor(comment.type)));
-        return panel;
-    }
+public class UserService {
+    private String dbPassword = "admin123";
+    ...
 }
 ```
 
-### 단축키
-| 단축키 | 기능 |
-|--------|------|
-| `Ctrl+Alt+R` | AI Review 실행 |
-| `Ctrl+Alt+S` | Quick Score 표시 |
+---
 
-### 빌드 및 실행
-```bash
-# 플러그인 빌드
-./gradlew :code-ai-intellij:buildPlugin
+## JSON 출력 요청하기
 
-# IDE에서 테스트 실행
-./gradlew :code-ai-intellij:runIde
-```
+AI 답변을 프로그램에서 쓰려면 **구조화된 형식**이 필요해요:
 
-## VS Code 확장
+```java
+public PromptBuilder withJsonOutput() {
+    userPrompt.append("""
 
-### 프로젝트 구조
-```
-code-ai-vscode/
-├── package.json        # 확장 설정
-├── tsconfig.json       # TypeScript 설정
-└── src/
-    └── extension.ts    # 메인 확장 코드
-```
+        ## 출력 형식
 
-### package.json
-```json
-{
-  "name": "code-ai-review",
-  "displayName": "Code AI Review",
-  "activationEvents": ["onLanguage:java"],
-  "contributes": {
-    "commands": [
-      {
-        "command": "codeai.aiReview",
-        "title": "AI Review",
-        "category": "Code AI"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "codeai.aiReview",
-        "key": "ctrl+alt+r",
-        "when": "editorTextFocus && editorLangId == java"
-      }
-    ]
-  }
+        다음 JSON 형식으로 응답해주세요:
+
+        ```json
+        {
+          "summary": "전체 요약 (1-2문장)",
+          "grade": "A/B/C/D/F",
+          "score": 0-100,
+          "issues": [
+            {
+              "severity": "CRITICAL|ERROR|WARNING|INFO",
+              "line": 라인번호,
+              "message": "이슈 설명",
+              "suggestion": "수정 제안"
+            }
+          ],
+          "positives": ["좋은 점 1", "좋은 점 2"]
+        }
+        ```
+        """);
+    return this;
 }
 ```
 
-### 주요 기능
+이렇게 하면 AI가 JSON으로 답해줘서 바로 파싱할 수 있어요.
 
-#### 1. AI Review 명령
-```typescript
-let aiReviewCommand = vscode.commands.registerCommand(
-    'codeai.aiReview',
-    async () => {
-        await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
-            title: 'AI 코드 리뷰 중...'
-        }, async (progress) => {
-            const result = await callAIReviewAPI(code);
-            displayReviewResult(document.uri, fileName, result);
-        });
+---
+
+## 특정 관점에 집중하기
+
+보안만 집중적으로 보고 싶을 때:
+
+```java
+public PromptBuilder focusOn(ReviewFocus... focuses) {
+    userPrompt.append("\n## 집중 분석 영역\n");
+    for (ReviewFocus focus : focuses) {
+        switch (focus) {
+            case SECURITY ->
+                userPrompt.append("- 보안 취약점 (SQL Injection, XSS 등)\n");
+            case PERFORMANCE ->
+                userPrompt.append("- 성능 이슈 (알고리즘 효율성)\n");
+            case READABILITY ->
+                userPrompt.append("- 가독성 (명명 규칙, 코드 구조)\n");
+        }
     }
-);
+    return this;
+}
+
+// 사용
+String prompt = new PromptBuilder()
+    .forCodeReview()
+    .withCode(code, "UserService.java")
+    .focusOn(ReviewFocus.SECURITY)  // 보안만!
+    .withJsonOutput()
+    .build();
 ```
 
-#### 2. 진단 정보 표시
-```typescript
-// 에디터에 문제 표시 (밑줄)
-function updateDiagnostics(uri: vscode.Uri, comments: ReviewComment[]) {
-    const diagnostics = comments.map(comment => {
-        const range = new vscode.Range(
-            new vscode.Position(comment.line - 1, 0),
-            new vscode.Position(comment.line - 1, 1000)
+---
+
+## 하이브리드 분석: 우리 분석 + AI
+
+Part 2에서 우리가 분석한 결과를 AI에게 전달하면 더 똑똑한 리뷰가 나와요:
+
+```java
+public PromptBuilder withExistingAnalysis(ScoreResult score, List<Issue> issues) {
+    userPrompt.append("\n## 기존 분석 결과\n\n");
+    userPrompt.append("점수: ").append(score.overallScore).append("/100\n");
+    userPrompt.append("등급: ").append(score.grade).append("\n\n");
+
+    if (!issues.isEmpty()) {
+        userPrompt.append("발견된 이슈:\n");
+        issues.forEach(issue ->
+            userPrompt.append("- [").append(issue.getSeverity())
+                .append("] ").append(issue.getMessage()).append("\n")
         );
-        return new vscode.Diagnostic(range, comment.message, severity);
-    });
-    diagnosticCollection.set(uri, diagnostics);
+    }
+
+    userPrompt.append("\n이 분석을 바탕으로 추가적인 인사이트를 제공해주세요.\n");
+    return this;
 }
 ```
 
-#### 3. 상태 바 점수 표시
-```typescript
-const statusBarItem = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right, 100
-);
-statusBarItem.text = `🌟 A (95/100)`;
-statusBarItem.tooltip = `구조: 90\n가독성: 95\n...`;
-statusBarItem.show();
+우리가 찾은 문제를 AI가 보완해주는 거예요!
+
+---
+
+## Few-shot: 예시 보여주기
+
+AI에게 "이런 식으로 해줘"라고 예시를 보여주면 더 정확해요:
+
+```java
+public PromptBuilder withExample(String inputCode, String expectedOutput) {
+    userPrompt.append("\n## 예시\n\n");
+    userPrompt.append("입력:\n```java\n").append(inputCode).append("\n```\n");
+    userPrompt.append("출력:\n").append(expectedOutput).append("\n");
+    return this;
+}
 ```
 
-### 빌드 및 실행
+이걸 **Few-shot Learning**이라고 해요.
+
+---
+
+## 프롬프트 최적화 팁
+
+### 1. 명확한 역할 부여
+```
+❌ "코드를 봐줘"
+✅ "당신은 10년 경력의 시니어 Java 개발자입니다. 보안 전문가로서..."
+```
+
+### 2. 구체적인 지시
+```
+❌ "문제를 찾아줘"
+✅ "SQL Injection, XSS, 하드코딩된 비밀정보를 찾아서 라인 번호와 함께 보고해줘"
+```
+
+### 3. 출력 형식 지정
+```
+❌ "결과를 알려줘"
+✅ "다음 JSON 형식으로 응답해줘: { ... }"
+```
+
+### 4. 언어 지정
+```
+✅ "한국어로 응답해주세요"
+```
+
+---
+
+## 토큰과 비용
+
+프롬프트가 길수록 돈이 많이 들어요:
+
+| 모델 | 입력 비용 | 출력 비용 |
+|------|----------|----------|
+| Claude 3.5 Sonnet | $3/100만 토큰 | $15/100만 토큰 |
+| GPT-4o | $2.5/100만 토큰 | $10/100만 토큰 |
+
+대략 **4글자 = 1토큰**이에요.
+
+```java
+private int estimateTokens(String text) {
+    return text.length() / 4;
+}
+```
+
+코드가 너무 길면 잘라야 해요:
+
+```java
+public PromptBuilder withTokenLimit(int maxTokens) {
+    if (estimateTokens(code) > maxTokens) {
+        code = truncateCode(code, maxTokens);
+        userPrompt.append("(코드가 길어 일부만 포함됨)\n");
+    }
+    return this;
+}
+```
+
+---
+
+## 핵심 정리
+
+1. **구조화된 프롬프트** → 시스템 + 컨텍스트 + 작업 + 형식 + 예시
+2. **빌더 패턴** → 유연하게 프롬프트 조립
+3. **JSON 출력** → 프로그램에서 바로 파싱 가능
+4. **하이브리드** → 우리 분석 + AI 인사이트
+
+---
+
+## 다음 시간 예고
+
+좋은 프롬프트는 만들었어요. 근데...
+
+- 간단한 작업에 비싼 모델 쓸 필요 있나요?
+- 복잡한 분석은 더 강력한 모델이 좋지 않을까요?
+- 비용은 어떻게 관리하죠?
+
+다음 STEP에서는 **작업에 맞는 AI 모델 선택하기**를 알아볼게요!
+
+---
+
+## 실습
+
 ```bash
-cd code-ai-vscode
-
-# 의존성 설치
-npm install
-
-# 컴파일
-npm run compile
-
-# VS Code에서 테스트 (F5로 디버그)
+cd code-ai-part3-service
+../gradlew :step14-prompt:run
 ```
 
-## UI 미리보기
-
-### IntelliJ Tool Window
-```
-┌─────────────────────────────────────────────────────────┐
-│ AI Review: UserService.java                          B │
-├─────────────────────────────────────────────────────────┤
-│ 📊 코드 품질 점수                                       │
-│   구조        [████████░░] 85/100                      │
-│   가독성      [█████████░] 90/100                      │
-│   유지보수성  [███████░░░] 75/100                      │
-│   신뢰성      [████████░░] 80/100                      │
-│   보안        [███████░░░] 70/100                      │
-│   성능        [████████░░] 85/100                      │
-│   ────────────────────────────                         │
-│   종합 점수: 80/100                                    │
-├─────────────────────────────────────────────────────────┤
-│ 📝 리뷰 코멘트: 5개                                     │
-│ ─────────────────────────────────────────────────────  │
-│ │ 👍 Line 1: 메서드들이 짧고 집중되어 있어요.           │
-│ ─────────────────────────────────────────────────────  │
-│ │ 💡 Line 45: 이 메서드가 35줄로 꽤 길어요...          │
-│ │                                                      │
-│ │   // After:                                          │
-│ │   public void processUser() {                        │
-│ │       validateInput();                               │
-│ │       processData();                                 │
-│ │   }                                                  │
-│ ─────────────────────────────────────────────────────  │
-└─────────────────────────────────────────────────────────┘
-```
-
-### VS Code 출력 채널
-```
-============================================================
-🤖 AI 코드 리뷰 결과: UserService.java
-============================================================
-
-📊 코드 품질 점수:
-   구조:        85/100
-   가독성:      90/100
-   유지보수성:  75/100
-   신뢰성:      80/100
-   보안:        70/100
-   성능:        85/100
-   ──────────────────────
-   종합:        80/100  등급: B
-
-📝 리뷰 코멘트: 3개
-------------------------------------------------------------
-💡 Line 25: 프로덕션 코드에서 System.out.println 대신 로깅 프레임워크를 사용하는 게 좋아요.
-
-⚠️ Line 42: catch 블록이 비어 있어요. 최소한 로그라도 남기는 게 좋아요.
-
-💡 Line 78: TODO 주석이 있네요. 기술 부채 관리가 필요해요.
-```
-
-## 파일 구조
-```
-code-ai/
-├── code-ai-intellij/           # IntelliJ 플러그인
-│   ├── build.gradle
-│   └── src/main/
-│       ├── java/com/codeai/intellij/
-│       │   ├── action/
-│       │   ├── service/
-│       │   └── toolwindow/
-│       └── resources/
-│           ├── META-INF/plugin.xml
-│           └── icons/
-│
-└── code-ai-vscode/             # VS Code 확장
-    ├── package.json
-    ├── tsconfig.json
-    └── src/extension.ts
-```
-
-## CLI 버전: v8.0
-```bash
-# 사용 가능한 명령어
-code-ai train          # 모델 학습
-code-ai complete       # 코드 자동완성
-code-ai review         # 정규식 기반 리뷰
-code-ai ast-review     # AST 기반 리뷰
-code-ai project-review # 프로젝트 분석
-code-ai type-check     # 타입 분석
-code-ai ai-review      # AI 코드 리뷰
-```
-
-## 다음 단계
-- STEP-15: CI/CD 통합 (GitHub Actions)
-- STEP-16: LLM 연동 (Claude/GPT API)
-- STEP-17: 코드 자동 수정 (Auto-fix)
+여러 가지 프롬프트를 만들어보고, AI 응답이 어떻게 달라지는지 비교해보세요!

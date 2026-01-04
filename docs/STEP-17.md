@@ -1,396 +1,325 @@
-# STEP-17: 코드 자동 수정 (Auto-fix)
+# STEP 17: AI가 직접 코드를 고쳐준다면? - 액션 실행
 
-## 목표
-발견된 코드 이슈를 자동으로 수정하는 기능을 구현합니다. 규칙 기반 수정과 LLM 기반 수정을 조합한 하이브리드 방식을 사용합니다.
+> AI가 "2번째 줄에 비밀번호가 하드코딩되어 있어요. 환경변수를 쓰세요"라고 했어요.
+> 보여주기만 하면 아쉬워요. **직접 고쳐주면** 어떨까요?
 
-## 아키텍처
+---
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Auto-fix System                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                   AutoFixer                          │   │
-│  │              (규칙 기반 수정)                         │   │
-│  │                                                     │   │
-│  │  • EMPTY_CATCH → 로깅 추가                          │   │
-│  │  • SYSTEM_OUT → Logger 변환                         │   │
-│  │  • MAGIC_NUMBER → 상수 추출                         │   │
-│  │  • MISSING_BRACES → 중괄호 추가                     │   │
-│  │  • DEEP_NESTING → Early return 적용                 │   │
-│  │  • TRAILING_WHITESPACE → 공백 제거                  │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                          │                                  │
-│                          ▼                                  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                 LLMAutoFixer                         │   │
-│  │               (LLM 기반 수정)                         │   │
-│  │                                                     │   │
-│  │  • 복잡한 리팩토링                                   │   │
-│  │  • 알고리즘 최적화                                   │   │
-│  │  • 보안 취약점 수정                                  │   │
-│  │  • 아키텍처 개선                                     │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+## 액션이 뭔데?
 
-## 구현 내용
-
-### 1. AutoFixer (규칙 기반)
-
-```java
-AutoFixer fixer = new AutoFixer();
-AutoFixer.FixReport report = fixer.fix(code);
-
-System.out.println(report.formatReport());
-System.out.println(report.fixedCode());
-```
-
-**지원하는 수정 유형:**
-
-| 유형 | 설명 | 예시 |
-|------|------|------|
-| EMPTY_CATCH | 빈 catch 블록에 로깅 추가 | `catch(e) {}` → `catch(e) { logger.error(...); }` |
-| SYSTEM_OUT | System.out을 Logger로 변환 | `System.out.println()` → `logger.info()` |
-| MAGIC_NUMBER | 매직 넘버를 상수로 추출 | `if (x > 100)` → `if (x > MAX_VALUE)` |
-| MISSING_BRACES | 누락된 중괄호 추가 | `if (x) return;` → `if (x) { return; }` |
-| DEEP_NESTING | Early return 패턴 적용 | 중첩 if → Guard clause |
-| TRAILING_WHITESPACE | 후행 공백 제거 | `code   \n` → `code\n` |
-| NULL_CHECK | null 체크 추가 | Objects.requireNonNull() 사용 |
-| RAW_TYPE | Raw type에 제네릭 추가 | `List` → `List<Object>` |
-
-### 2. LLMAutoFixer (LLM 기반)
-
-```java
-// Claude 사용
-LLMAutoFixer fixer = LLMAutoFixer.withClaude();
-
-// OpenAI 사용
-LLMAutoFixer fixer = LLMAutoFixer.withOpenAI();
-
-// Ollama 사용
-LLMAutoFixer fixer = LLMAutoFixer.withOllama("codellama:13b");
-
-// 수정 실행
-LLMAutoFixer.LLMFixResult result = fixer.fix(code, issues);
-System.out.println(result.formatReport());
-```
-
-**LLM 수정 기능:**
-
-```java
-// 이슈 목록 기반 수정
-LLMFixResult result = fixer.fix(code, List.of(
-    "Line 45: SQL Injection 취약점",
-    "Line 78: 메서드가 너무 깁니다"
-));
-
-// 단일 이슈 수정
-LLMFixResult result = fixer.fixIssue(code, "SQL Injection 취약점 수정");
-
-// 전체 코드 개선
-LLMFixResult result = fixer.improve(code);
-
-// 특정 라인 범위만 수정
-LLMFixResult result = fixer.fixLines(code, 45, 60, "보안 취약점 수정");
-```
-
-### 3. 하이브리드 수정 프로세스
+AI의 제안을 **실제로 실행**하는 거예요:
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    수정 프로세스                          │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  1. 규칙 기반 수정 (AutoFixer)                           │
-│     • 빠른 패턴 매칭                                     │
-│     • 결정적 변환                                        │
-│     • 비용 없음                                          │
-│                        ↓                                 │
-│  2. 잔여 이슈 필터링                                     │
-│     • 규칙으로 수정된 이슈 제외                          │
-│     • LLM 수정이 필요한 이슈 선별                        │
-│                        ↓                                 │
-│  3. LLM 기반 수정 (LLMAutoFixer)                         │
-│     • 복잡한 리팩토링                                    │
-│     • 컨텍스트 이해 필요한 수정                          │
-│     • 창의적 해결책                                      │
-│                        ↓                                 │
-│  4. 결과 병합                                            │
-│     • 모든 변경 사항 통합                                │
-│     • 변경 이력 추적                                     │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+AI 응답 → 파싱 → 액션 결정 → 실행!
+
+"2번째 줄 수정하세요"  →  파일 열기 → 2번째 줄 교체 → 저장
 ```
 
-## CLI 사용법
+---
 
-### 기본 사용
+## 액션의 종류
 
-```bash
-# 규칙 기반 수정 (미리보기)
-code-ai auto-fix src/MyClass.java
+| 액션 | 설명 | 위험도 |
+|------|------|--------|
+| `EDIT_CODE` | 코드 수정 | 중간 |
+| `CREATE_FILE` | 새 파일 생성 | 낮음 |
+| `DELETE_FILE` | 파일 삭제 | **높음** |
+| `RUN_COMMAND` | 명령 실행 (테스트 등) | **높음** |
+| `REPORT` | 리포트 생성 | 낮음 |
 
-# 파일에 직접 저장
-code-ai auto-fix src/MyClass.java --write
+위험한 액션은 조심해야 해요!
 
-# LLM 기반 수정 포함
-code-ai auto-fix src/MyClass.java --llm
+---
 
-# 특정 LLM 제공자 지정
-code-ai auto-fix src/MyClass.java --llm --provider openai
+## 코드 수정하기
 
-# diff 형식으로 출력
-code-ai auto-fix src/MyClass.java --diff
+AI가 이렇게 제안했다고 해봐요:
 
-# 백업 생성 후 수정
-code-ai auto-fix src/MyClass.java --write --backup
-
-# 디렉토리 전체 수정
-code-ai auto-fix src/ --write
-```
-
-### 옵션
-
-| 옵션 | 단축 | 설명 |
-|------|------|------|
-| `--write` | `-w` | 수정된 코드를 파일에 직접 저장 |
-| `--llm` | | LLM 기반 수정 활성화 |
-| `--provider` | `-p` | LLM 제공자 (claude, openai, ollama) |
-| `--diff` | | diff 형식으로 변경사항 출력 |
-| `--backup` | | 수정 전 백업 파일 생성 (.bak) |
-
-## 출력 예시
-
-### 규칙 기반 수정
-
-```
-============================================================
-🔧 자동 수정 결과
-============================================================
-
-📊 통계:
-   총 수정: 5개
-   파일: src/MyClass.java
-
-📝 적용된 수정:
-
-1. [EMPTY_CATCH] Line 45
-   - catch (Exception e) { }
-   + catch (Exception e) { logger.error("Exception occurred", e); }
-
-2. [SYSTEM_OUT] Line 67
-   - System.out.println("Debug: " + value);
-   + logger.info("Debug: {}", value);
-
-3. [MAGIC_NUMBER] Line 89
-   - if (count > 100) {
-   + private static final int MAX_COUNT = 100;
-   + if (count > MAX_COUNT) {
-
-4. [MISSING_BRACES] Line 102
-   - if (valid) return true;
-   + if (valid) { return true; }
-
-5. [TRAILING_WHITESPACE] Line 115
-   - (공백 제거됨)
-   +
-
-============================================================
-```
-
-### LLM 기반 수정
-
-```
-============================================================
-🤖 LLM 자동 수정 결과
-============================================================
-
-📝 총 2개 변경
-
-• Line 45: SQL Injection 취약점 수정
-  - String query = "SELECT * FROM users WHERE id = " + userId;
-  + PreparedStatement ps = conn.prepareStatement("SELECT * FROM users WHERE id = ?");
-  + ps.setInt(1, userId);
-
-• Line 78: 메서드 추출 리팩토링
-  - (35줄의 긴 메서드)
-  + validateInput();
-  + processData();
-  + saveResult();
-
-💡 설명:
-   SQL Injection 취약점을 PreparedStatement로 수정하고,
-   긴 메서드를 3개의 작은 메서드로 분리했습니다.
-
-📌 분석 정보:
-   모델: Claude (claude-3-5-sonnet-20241022)
-   토큰: 1,847
-```
-
-## 코드 구조
-
-```
-code-ai-analyzer/src/main/java/com/codeai/analyzer/fix/
-├── AutoFixer.java        # 규칙 기반 자동 수정
-└── LLMAutoFixer.java     # LLM 기반 자동 수정
-```
-
-### AutoFixer.java 주요 구조
-
-```java
-public class AutoFixer {
-
-    public enum FixType {
-        EMPTY_CATCH, SYSTEM_OUT, MAGIC_NUMBER, STRING_CONCAT_LOOP,
-        NULL_CHECK, DEEP_NESTING, RAW_TYPE, UNUSED_IMPORT,
-        TRAILING_WHITESPACE, MISSING_BRACES
-    }
-
-    // 수정 실행
-    public FixReport fix(String code) { ... }
-
-    // 특정 유형만 수정
-    public FixReport fix(String code, Set<FixType> types) { ... }
-
-    // 개별 수정 메서드
-    private void fixEmptyCatch(CompilationUnit cu, List<FixResult> fixes) { ... }
-    private void fixSystemOut(CompilationUnit cu, List<FixResult> fixes) { ... }
-    private void fixMagicNumbers(CompilationUnit cu, List<FixResult> fixes) { ... }
-    // ...
-
-    // 결과 레코드
-    public record FixResult(FixType type, int line, String description,
-                            String before, String after) {}
-    public record FixReport(String originalCode, String fixedCode,
-                           List<FixResult> fixes) { ... }
-}
-```
-
-### LLMAutoFixer.java 주요 구조
-
-```java
-public class LLMAutoFixer {
-
-    private final LLMClient client;
-    private final AutoFixer ruleFixer;
-
-    // 이슈 기반 수정
-    public LLMFixResult fix(String code, List<String> issues) { ... }
-
-    // 단일 이슈 수정
-    public LLMFixResult fixIssue(String code, String issue) { ... }
-
-    // 전체 개선
-    public LLMFixResult improve(String code) { ... }
-
-    // 특정 라인 수정
-    public LLMFixResult fixLines(String code, int start, int end, String issue) { ... }
-
-    // 팩토리 메서드
-    public static LLMAutoFixer withClaude(String apiKey) { ... }
-    public static LLMAutoFixer withOpenAI(String apiKey) { ... }
-    public static LLMAutoFixer withOllama(String model) { ... }
-
-    // 결과 레코드
-    public record LLMFixResult(String fixedCode, List<FixChange> changes,
-                               String explanation, boolean success,
-                               LLMMetadata metadata) { ... }
-    public record FixChange(int line, String description,
-                           String before, String after) {}
-    public record LLMMetadata(String model, int tokens) {}
-}
-```
-
-## LLM 프롬프트
-
-```
-You are an expert code refactoring assistant. Your task is to fix code issues.
-
-Rules:
-1. Only modify the specific issues mentioned
-2. Preserve the original code structure and style as much as possible
-3. Keep variable and method names consistent
-4. Add necessary imports if needed
-5. Ensure the fixed code compiles
-
-Respond in the following JSON format:
+```json
 {
-  "success": true,
-  "fixedCode": "// the complete fixed code",
-  "changes": [
-    {
-      "line": 10,
-      "description": "수정 설명 (한국어)",
-      "before": "original code snippet",
-      "after": "fixed code snippet"
-    }
-  ],
-  "explanation": "Overall explanation of changes in Korean"
+  "line": 2,
+  "originalCode": "private String password = \"admin123\";",
+  "fixedCode": "private String password = System.getenv(\"DB_PASSWORD\");"
 }
-
-IMPORTANT:
-- Return the COMPLETE fixed code, not just the changed parts
-- Ensure proper indentation and formatting
-- Keep all original comments
 ```
+
+이걸 실제로 적용하는 코드:
+
+```java
+public class ActionExecutor {
+    private final Path workingDirectory;
+
+    public ActionOutcome executeEditCode(Action action) throws IOException {
+        Path filePath = action.getFilePath();
+
+        // 1. 파일 읽기
+        String content = Files.readString(filePath);
+        String[] lines = content.split("\n");
+
+        // 2. 해당 라인 수정
+        int lineNum = action.getLineNumber();
+        if (lineNum > 0 && lineNum <= lines.length) {
+            String originalLine = lines[lineNum - 1];
+            lines[lineNum - 1] = action.getFixedCode();
+
+            // 3. 백업 생성 (안전!)
+            Path backupPath = createBackup(filePath);
+
+            // 4. 파일 저장
+            Files.writeString(filePath, String.join("\n", lines));
+
+            return ActionOutcome.success(action,
+                "Line " + lineNum + " 수정됨. 백업: " + backupPath);
+        }
+
+        return ActionOutcome.failed(action, "유효하지 않은 라인 번호");
+    }
+}
+```
+
+---
+
+## 백업은 필수!
+
+코드를 수정하기 전에 **항상 백업**해야 해요:
+
+```java
+private Path createBackup(Path originalPath) throws IOException {
+    Path backupDir = workingDirectory.resolve(".backups");
+    Files.createDirectories(backupDir);
+
+    String timestamp = String.valueOf(System.currentTimeMillis());
+    Path backupPath = backupDir.resolve(
+        originalPath.getFileName() + "." + timestamp + ".bak"
+    );
+
+    Files.copy(originalPath, backupPath);
+    return backupPath;
+}
+```
+
+뭔가 잘못되면 백업에서 복원할 수 있어요:
+
+```
+.backups/
+├── Example.java.1704123456789.bak
+├── Example.java.1704123456790.bak
+└── ...
+```
+
+---
 
 ## 안전 장치
 
-### 1. 백업
+AI가 시키는 대로 다 하면 위험해요! **안전 장치**가 필요해요:
 
-```bash
-# --backup 옵션 사용 시 .bak 파일 생성
-code-ai auto-fix src/MyClass.java --write --backup
-# → src/MyClass.java.bak 생성
-```
-
-### 2. 미리보기 모드
-
-```bash
-# --write 없이 실행하면 미리보기만
-code-ai auto-fix src/MyClass.java
-# → 변경사항만 표시, 파일 수정 없음
-```
-
-### 3. Diff 출력
-
-```bash
-# diff 형식으로 변경사항 검토
-code-ai auto-fix src/MyClass.java --diff
-```
-
-### 4. 선택적 수정
+### 1. 안전 모드
 
 ```java
-// 특정 유형만 수정
-AutoFixer fixer = new AutoFixer();
-FixReport report = fixer.fix(code, EnumSet.of(
-    FixType.EMPTY_CATCH,
-    FixType.SYSTEM_OUT
-));
+public class ActionExecutor {
+    private boolean safeMode = true;  // 기본값: 켜짐
+
+    public ActionOutcome executeAction(Action action) {
+        // 안전 모드에서 위험한 액션 차단
+        if (safeMode) {
+            if (action.getType() == ActionType.DELETE_FILE ||
+                action.getType() == ActionType.RUN_COMMAND) {
+                return ActionOutcome.blocked(action, "안전 모드에서 차단됨");
+            }
+        }
+
+        // ... 실행
+    }
+}
 ```
 
-## CLI 버전: v10.0
+### 2. 경로 제한
+
+```java
+private final Set<Path> allowedPaths = new HashSet<>();
+
+private boolean isActionAllowed(Action action) {
+    if (action.getFilePath() != null) {
+        Path normalized = action.getFilePath().toAbsolutePath().normalize();
+
+        // 허용된 경로 안에 있는지 확인
+        boolean inAllowedPath = allowedPaths.stream()
+            .anyMatch(allowed -> normalized.startsWith(allowed));
+
+        if (!inAllowedPath) {
+            return false;  // 허용 안 된 경로!
+        }
+    }
+    return true;
+}
+```
+
+`/etc/passwd` 같은 시스템 파일을 수정하려고 하면 차단!
+
+### 3. 명령 허용 목록
+
+```java
+private boolean isCommandAllowed(String command) {
+    List<String> allowedCommands = List.of(
+        "gradle", "mvn", "npm", "pytest", "go test"
+    );
+
+    return allowedCommands.stream()
+        .anyMatch(cmd -> command.startsWith(cmd));
+}
+```
+
+`rm -rf /`는 절대 실행 안 돼요!
+
+---
+
+## 실제 적용 예시
+
+AI가 이런 문제를 찾았어요:
+
+```java
+public class Example {
+    private String password = "admin123";
+
+    public void process(String input) {
+        String sql = "SELECT * FROM users WHERE id = '" + input + "'";
+    }
+}
+```
+
+AI 응답:
+
+```json
+{
+  "issues": [
+    {
+      "line": 2,
+      "fixedCode": "private String password = System.getenv(\"DB_PASSWORD\");"
+    },
+    {
+      "line": 5,
+      "fixedCode": "String sql = \"SELECT * FROM users WHERE id = ?\";"
+    }
+  ]
+}
+```
+
+적용 결과:
+
+```
+=== 자동 수정 적용 ===
+
+[SUCCESS] Line 2 수정됨. 백업: .backups/Example.java.1704123456789.bak
+[SUCCESS] Line 5 수정됨. 백업: .backups/Example.java.1704123456790.bak
+
+=== 수정된 코드 ===
+public class Example {
+    private String password = System.getenv("DB_PASSWORD");
+
+    public void process(String input) {
+        String sql = "SELECT * FROM users WHERE id = ?";
+    }
+}
+```
+
+자동으로 고쳐졌어요! 🎉
+
+---
+
+## 실행 취소 (Undo)
+
+실수로 잘못 수정했으면?
+
+```java
+public ActionOutcome undoLastAction() {
+    if (executedActions.isEmpty()) {
+        return ActionOutcome.failed(null, "취소할 액션 없음");
+    }
+
+    ExecutedAction last = executedActions.remove(executedActions.size() - 1);
+
+    // 백업에서 복원
+    Path backupPath = last.backupPath;
+    Path originalPath = last.action.getFilePath();
+
+    Files.copy(backupPath, originalPath, StandardCopyOption.REPLACE_EXISTING);
+
+    return ActionOutcome.success(last.action, "복원됨");
+}
+```
+
+백업이 있으니까 언제든 되돌릴 수 있어요.
+
+---
+
+## 액션 실행 결과
+
+```java
+public class ActionOutcome {
+    public final Action action;
+    public final Status status;
+    public final String message;
+
+    public enum Status {
+        SUCCESS,    // 성공
+        FAILED,     // 실패
+        BLOCKED     // 안전 장치에 의해 차단
+    }
+
+    public static ActionOutcome success(Action action, String message) {
+        return new ActionOutcome(action, Status.SUCCESS, message);
+    }
+
+    public static ActionOutcome blocked(Action action, String message) {
+        return new ActionOutcome(action, Status.BLOCKED, message);
+    }
+}
+```
+
+---
+
+## 안전 요약
+
+```
+┌────────────────────────────────────────────────────────┐
+│                    안전 장치                            │
+├────────────────────────────────────────────────────────┤
+│ 1. 안전 모드      → 위험 액션(삭제, 명령) 차단         │
+│ 2. 경로 제한      → 허용된 폴더만 접근                 │
+│ 3. 명령 허용목록  → gradle, npm 등만 실행              │
+│ 4. 자동 백업      → 모든 수정 전 백업 생성             │
+│ 5. 실행 취소      → 언제든 되돌리기 가능               │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 핵심 정리
+
+1. **액션 = AI 제안 실행** → 코드 수정, 파일 생성 등
+2. **안전 장치 필수** → 삭제/명령 차단, 경로 제한
+3. **백업은 생명** → 수정 전 항상 백업
+4. **Undo 가능** → 실수해도 복원 가능
+
+---
+
+## 다음 시간 예고
+
+수정은 했어요. 근데 **제대로 된 건지** 어떻게 알까요?
+
+- 수정 후에 테스트가 통과하나?
+- 새로운 문제가 생기진 않았나?
+- 점수가 올랐나?
+
+다음 STEP에서는 **수정 결과를 검증하고 개선하는 피드백 루프**를 알아볼게요!
+
+---
+
+## 실습
 
 ```bash
-code-ai auto-fix src/MyClass.java
-code-ai auto-fix src/MyClass.java --write
-code-ai auto-fix src/MyClass.java --llm --provider claude
+cd code-ai-part3-service
+../gradlew :step17-action:run
 ```
 
-## 비용 고려사항
-
-| 수정 방식 | 비용 | 속도 | 정확도 | 복잡성 처리 |
-|----------|------|------|--------|------------|
-| 규칙 기반 | 무료 | 매우 빠름 | 높음 | 단순 패턴만 |
-| LLM (Claude) | $0.01~0.05/파일 | 보통 | 높음 | 복잡한 리팩토링 |
-| LLM (Ollama) | 무료 | 느림 | 중간 | 로컬 실행 |
-
-## 다음 단계
-
-- STEP-18: 웹 대시보드
-- STEP-19: 팀 협업 기능
-- STEP-20: 지속적 학습 시스템
+AI의 제안을 직접 적용해보고, 코드가 어떻게 바뀌는지 확인해보세요!

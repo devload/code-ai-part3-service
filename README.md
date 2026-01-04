@@ -1,51 +1,56 @@
-# Code AI
+# AI Process - Part 3: AI 서비스 프로세스
 
-코드 특화 AI 어시스턴트 - N-gram 언어 모델 기반 코드 분석 시스템
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  [Java Code] → [Tokenizer] → [N-gram] → [AST] → [Score] │
-└─────────────────────────────────────────────────────────┘
-```
-
-## 특징
-
-- 🎓 **교육용**: 토크나이저부터 언어 모델까지 직접 구현
-- 🔍 **코드 분석**: AST 기반 정적 분석 + N-gram 확률 모델
-- 🛠 **자동 수정**: 발견된 이슈 자동 수정 (Auto-fix)
-- 🌐 **웹 대시보드**: 실시간 코드 분석 UI
-- 🔌 **확장 가능**: Claude, OpenAI, Ollama 연동 지원
+> **AI가 실제 서비스로 동작하는 과정**을 프로세스 관점에서 학습하는 교육용 프로젝트
+>
+> 이 프로젝트는 [Part 2: 코드 이해 프로세스](https://github.com/devload/code-ai-part2-analyzer)를 기반으로 합니다.
 
 ---
 
-## 빠른 시작
+## 학습 목표
 
-### CLI 사용 (v10.0)
-```bash
-# 빌드
-./gradlew build
+**AI가 API 호출부터 자동 수정까지 동작하는 서비스 과정을 이해합니다**
 
-# 코드 분석
-./gradlew :mini-ai-cli:run --args="analyze src/Example.java"
-
-# 점수 확인
-./gradlew :mini-ai-cli:run --args="score src/Example.java"
-
-# 자동 수정
-./gradlew :mini-ai-cli:run --args="auto-fix src/Example.java --write"
-
-# 코드 자동완성
-./gradlew :mini-ai-cli:run --args='complete "public class User {"'
 ```
-
-### 웹 대시보드
-```bash
-# 정적 HTML 버전
-open dashboard.html
-
-# Spring Boot 버전
-cd code-ai-web && ../gradlew bootRun
-# http://localhost:8080
+입력: "이 코드를 분석해줘"
+        │
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│ STEP 13: API 호출 (API Calling)                         │
+│ 요청 구성 → HTTP 전송 → 응답 수신                        │
+└─────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│ STEP 14: 프롬프트 구성 (Prompt Engineering)             │
+│ System Prompt + Context + Task + Output Format          │
+└─────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│ STEP 15: LLM 처리 (LLM Processing)                      │
+│ 모델 선택 → 비용/성능 최적화 → 라우팅                    │
+└─────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│ STEP 16: 응답 파싱 (Response Parsing)                   │
+│ JSON/Markdown → 구조화된 데이터 → 이슈 목록              │
+└─────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│ STEP 17: 액션 실행 (Action Execution)                   │
+│ 코드 수정 → 리팩토링 → 파일 변경                         │
+└─────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│ STEP 18: 피드백 루프 (Feedback Loop)                    │
+│ 검증 → 학습 → 재시도 전략 → 지속적 개선                  │
+└─────────────────────────────────────────────────────────┘
+        │
+        ▼
+출력: ✅ 수정된 코드 + 📊 분석 리포트
 ```
 
 ---
@@ -53,169 +58,214 @@ cd code-ai-web && ../gradlew bootRun
 ## 프로젝트 구조
 
 ```
-code-ai/
-├── mini-ai-core/             # 기초 유틸리티
-├── code-ai-tokenizer/        # 코드 토크나이저 (BPE)
-├── mini-ai-model-ngram/      # N-gram 언어 모델 (Trigram)
-├── code-ai-analyzer/         # 코드 분석 엔진
-│   ├── ast/                  # AST 분석 (JavaParser)
-│   ├── ai/                   # AI 코드 리뷰어
-│   ├── llm/                  # LLM 클라이언트
-│   └── fix/                  # 자동 수정
-├── mini-ai-server/           # REST API 서버
-├── mini-ai-cli/              # CLI (v10.0)
-├── code-ai-intellij/         # IntelliJ 플러그인
-├── code-ai-vscode/           # VS Code 확장
-├── code-ai-web/              # 웹 대시보드 (Spring Boot)
-├── .github/workflows/        # CI/CD (GitHub Actions)
-├── docs/                     # 문서 (STEP-00 ~ STEP-18)
-└── dashboard.html            # 정적 대시보드 UI
+ai-process-part3/
+├── step13-api/                # STEP 13: API 호출
+│   ├── APIClient.java
+│   └── APIDemo.java
+│
+├── step14-prompt/             # STEP 14: 프롬프트 구성
+│   ├── PromptBuilder.java
+│   └── PromptDemo.java
+│
+├── step15-llm/                # STEP 15: LLM 처리
+│   ├── LLMRouter.java
+│   └── LLMDemo.java
+│
+├── step16-response/           # STEP 16: 응답 파싱
+│   ├── ResponseParser.java
+│   └── ResponseDemo.java
+│
+├── step17-action/             # STEP 17: 액션 실행
+│   ├── ActionExecutor.java
+│   └── ActionDemo.java
+│
+├── step18-feedback/           # STEP 18: 피드백 루프
+│   ├── FeedbackLoop.java
+│   └── FeedbackDemo.java
+│
+├── service-pipeline/          # AI 서비스 파이프라인 통합
+│   └── ServicePipelineDemo.java
+│
+├── code-ai-analyzer/          # 기존 코드 분석 엔진
+├── code-ai-web/               # 웹 대시보드
+├── code-ai-intellij/          # IntelliJ 플러그인
+├── code-ai-vscode/            # VS Code 확장
+│
+└── docs/                      # 문서
 ```
 
 ---
 
-## 핵심 기능
+## 학습 단계
 
-### 1. 코드 분석
-```java
-AICodeReviewer reviewer = new AICodeReviewer();
-ReviewResult result = reviewer.review(javaCode);
-
-System.out.println("등급: " + result.grade());   // A, B, C, D, F
-System.out.println("점수: " + result.score());   // 0-100
-```
-
-### 2. 이슈 탐지
-
-| 이슈 | 설명 | 심각도 |
-|------|------|--------|
-| SQL_INJECTION | SQL 인젝션 취약점 | CRITICAL |
-| EMPTY_CATCH | 빈 catch 블록 | CRITICAL |
-| SYSTEM_OUT | System.out 사용 | WARNING |
-| MAGIC_NUMBER | 매직 넘버 | WARNING |
-| LONG_METHOD | 긴 메서드 (>50줄) | WARNING |
-| DEEP_NESTING | 깊은 중첩 (>4단계) | INFO |
-| MISSING_BRACES | 중괄호 누락 | INFO |
-
-### 3. 자동 수정
-```java
-AutoFixer fixer = new AutoFixer();
-FixReport report = fixer.fix(code);
-
-// 적용되는 수정:
-// - System.out → Logger 변환
-// - 빈 catch → 로깅 추가
-// - 매직 넘버 → 상수 추출
-// - 중괄호 누락 → 추가
-```
-
-### 4. 모델 선택
-```
-1. Code AI (Our N-gram Model)  ← 기본값
-2. Claude API
-3. OpenAI API
-4. Ollama (Local)
-```
+| STEP | 제목 | 핵심 질문 | 파일 |
+|------|------|----------|------|
+| 13 | API 호출 | LLM API는 어떻게 사용하는가? | `step13-api/` |
+| 14 | 프롬프트 구성 | 좋은 프롬프트는 어떻게 만드는가? | `step14-prompt/` |
+| 15 | LLM 처리 | 어떤 모델을 언제 쓰는가? | `step15-llm/` |
+| 16 | 응답 파싱 | AI 응답을 어떻게 처리하는가? | `step16-response/` |
+| 17 | 액션 실행 | AI가 도구를 어떻게 사용하는가? | `step17-action/` |
+| 18 | 피드백 루프 | 결과를 어떻게 개선하는가? | `step18-feedback/` |
 
 ---
 
-## CLI 명령어
+## 빠른 시작
+
+### 빌드
+```bash
+./gradlew build
+```
+
+### 각 단계 데모 실행
 
 ```bash
-# 기본 분석 (우리 모델)
-code-ai analyze <file>
+# STEP 13: API 호출 데모
+./gradlew :step13-api:run
 
-# 점수만 확인
-code-ai score <file>
+# STEP 14: 프롬프트 구성 데모
+./gradlew :step14-prompt:run
 
-# AST 분석
-code-ai ast <file>
+# STEP 15: LLM 처리 데모
+./gradlew :step15-llm:run
 
-# 자동 수정
-code-ai auto-fix <file> --write
+# STEP 16: 응답 파싱 데모
+./gradlew :step16-response:run
 
-# LLM 리뷰 (외부 모델)
-code-ai llm-review <file> --provider claude
+# STEP 17: 액션 실행 데모
+./gradlew :step17-action:run
 
-# 코드 자동완성
-code-ai complete "public class"
+# STEP 18: 피드백 루프 데모
+./gradlew :step18-feedback:run
 
-# 모델 학습
-code-ai train --corpus data/code.txt --model trigram
+# 전체 서비스 파이프라인
+./gradlew :service-pipeline:run
 ```
 
 ---
 
-## 웹 대시보드
+## 지원하는 LLM 프로바이더
 
-| 페이지 | 기능 |
-|--------|------|
-| **Dashboard** | 코드 입력, 실시간 분석, 점수/등급 표시 |
-| **Analyze** | 파일 업로드, LLM 옵션, Auto-fix |
-| **History** | 분석 기록, 필터, CSV 내보내기 |
-| **Settings** | 모델 선택, API 키, UI 설정 |
+| 프로바이더 | 특징 | 환경변수 |
+|-----------|------|---------|
+| Claude | 긴 컨텍스트, 안전성, 코드 분석 강점 | `CLAUDE_API_KEY` |
+| OpenAI | 다양한 모델, Function Calling | `OPENAI_API_KEY` |
+| Ollama | 로컬 실행, 무료, 프라이버시 | (불필요) |
 
-```bash
-# 정적 버전 (바로 사용 가능)
-open dashboard.html
+---
 
-# Spring Boot 버전
-cd code-ai-web && ../gradlew bootRun
+## 모델 선택 가이드
+
+```
+┌───────────────────────────────────────────────────────────┐
+│ 작업 유형별 권장 모델                                      │
+├─────────────────────────────┬─────────────────────────────┤
+│ 🚀 복잡한 분석              │ Claude Opus, GPT-4          │
+│ ⚖️  일반 코드 리뷰           │ Claude Sonnet, GPT-4-Turbo  │
+│ ⚡ 빠른 응답                │ Claude Haiku, GPT-3.5       │
+│ 🏠 민감 데이터              │ Ollama (로컬)               │
+└─────────────────────────────┴─────────────────────────────┘
 ```
 
 ---
 
-## 개발 단계 (STEP 00-18)
+## 프롬프트 엔지니어링 기법
 
-| Phase | 단계 | 내용 |
-|-------|------|------|
-| 1 | STEP 00-04 | 토크나이저, N-gram 기초 |
-| 2 | STEP 05-07 | 확률 계산, 스무딩, 평가 |
-| 3 | STEP 08-10 | AST 분석, 코드 품질 |
-| 4 | STEP 11-13 | AI 리뷰, 리팩토링 제안 |
-| 5 | STEP 14-18 | IDE 플러그인, CI/CD, 웹 UI |
+```
+┌─────────────────────────────────────────────────────────┐
+│ 효과적인 프롬프트 구조                                   │
+│                                                          │
+│ 1. System Prompt: "You are an expert code reviewer..."   │
+│                                                          │
+│ 2. Context: 코드, 분석 결과, 이전 대화                   │
+│                                                          │
+│ 3. Task: "Analyze this code for security issues..."      │
+│                                                          │
+│ 4. Output Format: "Respond in JSON format with..."       │
+└─────────────────────────────────────────────────────────┘
+```
 
-### 완료된 기능
+---
 
-- ✅ CodeTokenizer (코드 문법 인식)
-- ✅ Trigram 모델 + Backoff
-- ✅ AST 분석 (JavaParser)
-- ✅ 코드 품질 점수 (A~F 등급)
-- ✅ 자동 수정 (규칙 기반 + LLM)
-- ✅ IntelliJ / VS Code 플러그인
-- ✅ GitHub Actions CI/CD
-- ✅ 웹 대시보드
+## 자동 액션 타입
+
+| 액션 | 설명 |
+|------|------|
+| REPLACE_CODE | 코드 교체 |
+| INSERT_CODE | 코드 삽입 |
+| DELETE_CODE | 코드 삭제 |
+| ADD_IMPORT | import 추가 |
+| RENAME | 이름 변경 |
+| EXTRACT_METHOD | 메서드 추출 |
+| ADD_LOGGING | 로깅 추가 |
+
+---
+
+## 피드백 루프
+
+```
+       ┌──────────────┐
+       │   AI 실행    │
+       └──────┬───────┘
+              │
+              ▼
+       ┌──────────────┐
+       │   결과 평가  │◀────────────┐
+       └──────┬───────┘            │
+              │                    │
+        ┌─────┴─────┐              │
+        ▼           ▼              │
+    ┌───────┐  ┌───────┐           │
+    │ 성공  │  │ 실패  │───────────┤
+    └───────┘  └───┬───┘           │
+                   │               │
+                   ▼               │
+            ┌──────────────┐       │
+            │  전략 조정   │───────┘
+            └──────────────┘
+```
+
+---
+
+## 시리즈 구성
+
+```
+Part 1: AI 기초 프로세스
+├── 토큰화 → 컨텍스트 → 확률계산 → 샘플링 → 생성루프 → 후처리
+│
+Part 2: 코드 이해 프로세스
+├── 파싱 → AST → 의미분석 → 패턴매칭 → 이슈탐지 → 점수화
+│
+Part 3: AI 서비스 프로세스 (현재)
+└── API호출 → 프롬프트구성 → LLM처리 → 응답파싱 → 액션실행 → 피드백
+```
 
 ---
 
 ## 기술 스택
 
-| 영역 | 기술 |
-|------|------|
-| Language | Java 17 |
-| Build | Gradle 8.x |
-| Parser | JavaParser 3.25 |
-| Web | Spring Boot 3.2 |
-| HTTP | OkHttp 4.12 |
-| JSON | Gson 2.10 |
-| CLI | picocli 4.7 |
-| IDE | IntelliJ Platform SDK |
+| 기술 | 버전 | 용도 |
+|------|------|------|
+| OkHttp | 4.12.0 | HTTP 클라이언트 |
+| Gson | 2.10.1 | JSON 파싱 |
+| Spring Boot | 3.2.1 | 웹 서버 |
+| WebSocket | STOMP | 실시간 통신 |
+| IntelliJ SDK | Latest | IDE 플러그인 |
+| TypeScript | 5.0 | VS Code 확장 |
 
 ---
 
-## 문서
+## 이전 / 다음 단계
 
-| 문서 | 설명 |
-|------|------|
-| [PROJECT-SUMMARY.md](docs/PROJECT-SUMMARY.md) | 전체 프로젝트 요약 |
-| [STEP-00.md](docs/STEP-00.md) ~ [STEP-18.md](docs/STEP-18.md) | 단계별 구현 문서 |
+👈 [Part 2: 코드 이해 프로세스](https://github.com/devload/code-ai-part2-analyzer)
+
+👈 [Part 1: 기초 프로세스](https://github.com/devload/code-ai-part1-basics)
 
 ---
 
 ## 라이선스
 
-Educational Purpose
+MIT License
 
 ---
 
-**Version**: 1.0.0 | **CLI**: v10.0
+**Version**: 3.0.0 | **Focus**: AI Service Process Education

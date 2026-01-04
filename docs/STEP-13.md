@@ -1,351 +1,303 @@
-# STEP-13: AI 코드 리뷰
+# STEP 13: AI에게 말 걸기 - API 호출
 
-## 목표
-규칙 기반 + 자연어 피드백 생성을 통해 AI 코드 리뷰의 개념을 시연합니다.
+> Part 2에서 우리는 코드를 분석하고 점수까지 매겼어요.
+> 이제 진짜 AI에게 "이 코드 어때?"라고 물어볼 차례예요!
 
-## 핵심 개념
+---
 
-### 1. AI 코드 리뷰란?
-- 코드를 분석하여 **자연어 형태의 피드백** 제공
-- 품질 점수 계산 및 등급 산정
-- 개선 제안 및 예시 코드 제공
-- 칭찬과 격려를 통한 긍정적 피드백
+## AI와 대화하려면?
 
-### 2. 실제 프로덕션에서는?
+AI는 웹사이트에만 있는 게 아니에요. **API**를 통해 우리 프로그램에서 직접 호출할 수 있어요.
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  실제 AI 코드 리뷰 시스템                                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌───────────────┐    ┌───────────────┐    ┌─────────────┐ │
-│  │ Code Embedding │ →  │ Vector Search │ →  │ LLM Review  │ │
-│  │ (CodeBERT)    │    │ (Similar Code)│    │ (GPT/Claude)│ │
-│  └───────────────┘    └───────────────┘    └─────────────┘ │
-│                                                             │
-│  - CodeBERT: 코드 의미 이해                                  │
-│  - GraphCodeBERT: 코드 구조 이해 (AST + DFG)                │
-│  - OpenAI Codex / Claude: 자연어 리뷰 생성                   │
-│  - Ollama + CodeLlama: 로컬 LLM 옵션                        │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌──────────┐     HTTP POST      ┌──────────┐
+│ 우리 앱  │ ─────────────────► │   AI     │
+│ (질문)   │                    │ (Claude) │
+└──────────┘                    └──────────┘
+      ▲                               │
+      │     JSON 응답                 ▼
+      │ ◄───────────────────── ┌──────────┐
+      │                        │   답변   │
+      └────────────────────────└──────────┘
 ```
 
-## 구현 내용
+마치 카카오톡 메시지 보내듯이, AI에게 메시지를 보내고 답변을 받는 거예요.
 
-### AICodeReviewer 클래스
-```java
-public class AICodeReviewer {
-    // 리뷰 템플릿 (자연어)
-    private static final Map<String, List<String>> REVIEW_TEMPLATES = new HashMap<>();
+---
 
-    static {
-        REVIEW_TEMPLATES.put("LONG_METHOD", List.of(
-            "이 메서드가 %d줄로 꽤 길어요. 읽기 쉽게 작은 메서드로 나눠보는 건 어떨까요?",
-            "메서드 '%s'가 너무 많은 일을 하고 있는 것 같아요."
-        ));
+## 어디에 말을 걸지?
 
-        REVIEW_TEMPLATES.put("SECURITY", List.of(
-            "🚨 보안 이슈가 보여요! 사용자 입력을 검증 없이 사용하면 안 돼요.",
-            "비밀번호나 API 키가 코드에 하드코딩되어 있어요. 절대 안 됩니다!"
-        ));
+여러 AI 제공자가 있어요:
 
-        REVIEW_TEMPLATES.put("PRAISE", List.of(
-            "👍 깔끔한 코드네요! 읽기 쉽게 잘 작성되어 있어요.",
-            "메서드 분리가 잘 되어 있어서 이해하기 쉬워요."
-        ));
-    }
-}
-```
+| 제공자 | 모델 | 특징 |
+|--------|------|------|
+| **Anthropic** | Claude | 코드 이해 뛰어남, 안전함 |
+| **OpenAI** | GPT-4 | 범용적, 널리 사용됨 |
+| **Ollama** | 로컬 LLM | 무료! 인터넷 필요 없음 |
 
-### 코드 품질 점수 (6가지 차원)
-```java
-public static class CodeQualityScore {
-    public int structureScore = 0;      // 구조
-    public int readabilityScore = 0;    // 가독성
-    public int maintainabilityScore = 0; // 유지보수성
-    public int reliabilityScore = 0;    // 신뢰성
-    public int securityScore = 0;       // 보안
-    public int performanceScore = 0;    // 성능
+오늘은 주로 Claude를 예시로 들게요.
 
-    public String getGrade() {
-        int score = getOverallScore();
-        if (score >= 90) return "A";
-        if (score >= 80) return "B";
-        if (score >= 70) return "C";
-        if (score >= 60) return "D";
-        return "F";
-    }
-}
-```
+---
 
-### 리뷰 유형
-```java
-public enum ReviewType {
-    PRAISE("👍"),      // 칭찬
-    SUGGESTION("💡"),  // 제안
-    ISSUE("⚠️"),       // 이슈
-    CRITICAL("🚨"),    // 심각
-    ERROR("❌");       // 에러
-}
-```
+## API 키가 뭔데?
 
-## 분석 항목
+AI 서비스를 쓰려면 **API 키**가 필요해요. 마치 집에 들어갈 때 열쇠가 필요한 것처럼요.
 
-### 1. 코드 구조 (Structure)
-- 긴 메서드 검사 (30줄 이상)
-- 너무 많은 메서드 (15개 이상)
-- 깊은 중첩 (4단계 이상)
-
-### 2. 명명 규칙 (Naming)
-- 짧은 변수명 (2자 이하)
-- 클래스명 컨벤션 (대문자 시작)
-- 메서드명 컨벤션 (소문자 시작)
-
-### 3. 복잡도 (Complexity)
-- 복잡한 조건문 (논리 연산자 3개 이상)
-- 긴 메서드 체인 (5개 이상)
-
-### 4. 에러 처리 (Error Handling)
-- 빈 catch 블록
-- 광범위한 예외 처리 (Exception/Throwable)
-
-### 5. 보안 (Security)
-- 하드코딩된 비밀정보
-- SQL Injection 가능성
-
-### 6. 성능 (Performance)
-- 루프 내 객체 생성
-- 문자열 연결 루프
-
-### 7. 베스트 프랙티스
-- System.out.println 사용
-- 하드코딩된 매직 넘버
-
-## CLI 사용법
-
-### 기본 사용
 ```bash
-# AI 코드 리뷰
-code-ai ai-review src/MyClass.java
+# 환경변수로 설정
+export ANTHROPIC_API_KEY=sk-ant-...
 
-# JSON 형식 출력
-code-ai ai-review src/MyClass.java --json
+# Windows의 경우
+set ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-### 실행 예시
-```
-🤖 AI 코드 리뷰 시작...
-  파일: src/UserService.java
-  분석기: AICodeReviewer (자연어 피드백)
+🚨 **절대로 소스 코드에 API 키를 직접 쓰면 안 돼요!**
 
-============================================================
-🤖 AI 코드 리뷰 결과
-============================================================
-
-📊 코드 품질 점수:
-   ┌────────────────────────────────────┐
-   │ 구조        85/100  ████████░░│
-   │ 가독성      90/100  █████████░│
-   │ 유지보수성  75/100  ███████░░░│
-   │ 신뢰성      80/100  ████████░░│
-   │ 보안        70/100  ███████░░░│
-   │ 성능        85/100  ████████░░│
-   ├────────────────────────────────────┤
-   │ 종합        80/100  등급: B      │
-   └────────────────────────────────────┘
-
-📝 리뷰 코멘트: 5개
-   🚨 Critical: 0 | ⚠️ Issue: 1 | 💡 Suggestion: 3 | 👍 Praise: 1
-------------------------------------------------------------
-👍 Line 1: 메서드들이 짧고 집중되어 있어요. 좋은 구조예요!
-------------------------------------------------------------
-💡 Line 45: 이 메서드가 35줄로 꽤 길어요. 읽기 쉽게 작은 메서드로 나눠보는 건 어떨까요?
-
-// Before:
-// public void processUser() {
-//     // 50줄의 코드...
-// }
-
-// After:
-public void processUser() {
-    validateInput();
-    processData();
-    saveResult();
-}
-------------------------------------------------------------
-⚠️ Line 78: Exception/Throwable을 직접 잡는 건 좋지 않아요. 구체적인 예외 타입을 사용해주세요.
-------------------------------------------------------------
-
-📋 요약:
-   ✅ 전반적으로 잘 작성된 코드예요!
-```
-
-## 점수 계산 방식
-
-### 기본 점수
-- 각 차원 100점 만점에서 시작
-- 이슈 발견 시 감점
-
-### 감점 기준
-| 항목 | 감점 |
-|------|------|
-| 긴 메서드 (>30줄) | -10 |
-| 긴 메서드 (>20줄) | -5 |
-| 너무 많은 메서드 | -10 |
-| 깊은 중첩 | -15 |
-| 짧은 변수명 | -5 |
-| 클래스명 규칙 위반 | -10 |
-| 복잡한 조건문 | -10 |
-| 빈 catch 블록 | -15 |
-| 광범위한 예외 처리 | -5 |
-| 하드코딩된 비밀정보 | -30 |
-| SQL Injection 가능성 | -30 |
-| 루프 내 객체 생성 | -10 |
-| 문자열 연결 루프 | -10 |
-| System.out.println | -3 |
-| 매직 넘버 | -3 |
-
-### 등급 기준
-| 등급 | 점수 범위 |
-|------|-----------|
-| A | 90-100 |
-| B | 80-89 |
-| C | 70-79 |
-| D | 60-69 |
-| F | 0-59 |
-
-## 긍정적 피드백
-
-AI 리뷰어는 문제점만 지적하지 않고 잘된 부분도 칭찬합니다:
-
-- **점수가 80점 이상**: 격려 메시지 추가
-- **Javadoc이 3개 이상**: 문서화 칭찬
-- **짧은 메서드가 5개 이상**: 구조 칭찬
-
-```
-👍 깔끔한 코드네요! 읽기 쉽게 잘 작성되어 있어요.
-👍 Javadoc이 잘 작성되어 있네요! 다른 개발자들이 이해하기 쉬울 거예요.
-👍 메서드들이 짧고 집중되어 있어요. 좋은 구조예요!
-```
-
-## 개선 제안 예시
-
-### Extract Method
 ```java
-// Before:
-// public void processUser() {
-//     // 50줄의 코드...
-// }
+// ❌ 절대 하지 마세요!
+private String apiKey = "sk-ant-12345...";
 
-// After:
-public void processUser() {
-    validateInput();
-    processData();
-    saveResult();
-}
-
-private void validateInput() { /* ... */ }
-private void processData() { /* ... */ }
-private void saveResult() { /* ... */ }
+// ✅ 환경변수에서 읽어오세요
+private String apiKey = System.getenv("ANTHROPIC_API_KEY");
 ```
 
-### Early Return
+---
+
+## 실제로 호출해보기
+
+Claude API를 호출하는 코드를 볼게요:
+
 ```java
-// Before (깊은 중첩):
-if (user != null) {
-    if (user.isActive()) {
-        if (user.hasPermission()) {
-            // 실제 로직
+public class APIClient {
+    private final OkHttpClient httpClient = new OkHttpClient();
+    private final Gson gson = new Gson();
+
+    public String callClaude(String prompt) throws IOException {
+        // 1. 요청 만들기
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("model", "claude-3-5-sonnet-20241022");
+        requestBody.addProperty("max_tokens", 4096);
+
+        JsonArray messages = new JsonArray();
+        JsonObject message = new JsonObject();
+        message.addProperty("role", "user");
+        message.addProperty("content", prompt);
+        messages.add(message);
+        requestBody.add("messages", messages);
+
+        // 2. HTTP 요청 보내기
+        Request request = new Request.Builder()
+            .url("https://api.anthropic.com/v1/messages")
+            .addHeader("x-api-key", System.getenv("ANTHROPIC_API_KEY"))
+            .addHeader("anthropic-version", "2023-06-01")
+            .addHeader("Content-Type", "application/json")
+            .post(RequestBody.create(
+                gson.toJson(requestBody),
+                MediaType.parse("application/json")
+            ))
+            .build();
+
+        // 3. 응답 받기
+        try (Response response = httpClient.newCall(request).execute()) {
+            String responseBody = response.body().string();
+            JsonObject json = gson.fromJson(responseBody, JsonObject.class);
+
+            return json.getAsJsonArray("content")
+                .get(0).getAsJsonObject()
+                .get("text").getAsString();
         }
     }
 }
-
-// After (Early Return):
-if (user == null) return;
-if (!user.isActive()) return;
-if (!user.hasPermission()) return;
-// 실제 로직
 ```
 
-### 조건 추출
-```java
-// Before:
-// if (user != null && user.isActive() && user.getAge() >= 18 && hasPermission)
+복잡해 보이지만, 핵심은 간단해요:
+1. **요청 만들기** - 모델 이름, 질문 담기
+2. **HTTP 요청 보내기** - API 키와 함께 전송
+3. **응답 받기** - JSON에서 답변 추출
 
-// After:
-boolean isValidUser = user != null && user.isActive();
-boolean isAdult = user.getAge() >= 18;
-boolean canProceed = isValidUser && isAdult && hasPermission;
+---
 
-if (canProceed) {
-    // ...
+## API 요청/응답 형식
+
+Claude에게 이렇게 보내면:
+
+```json
+{
+  "model": "claude-3-5-sonnet-20241022",
+  "max_tokens": 4096,
+  "messages": [
+    {"role": "user", "content": "Java에서 null을 안전하게 처리하는 방법 알려줘"}
+  ]
 }
 ```
 
-## 확장 가능성
+이렇게 답이 와요:
 
-### 1. LLM 연동
-```java
-// OpenAI API 연동 예시
-public class LLMCodeReviewer {
-    private final OpenAI openai;
-
-    public String review(String code) {
-        return openai.chat()
-            .model("gpt-4")
-            .messages(List.of(
-                new Message("system", "You are a senior code reviewer."),
-                new Message("user", "Review this code:\n" + code)
-            ))
-            .call()
-            .getContent();
-    }
+```json
+{
+  "content": [
+    {"type": "text", "text": "Java에서 null을 안전하게 처리하는 방법..."}
+  ],
+  "usage": {
+    "input_tokens": 15,
+    "output_tokens": 200
+  }
 }
 ```
 
-### 2. Claude API 연동
-```java
-// Claude API 연동 예시
-public class ClaudeCodeReviewer {
-    private final Anthropic anthropic;
+`usage` 필드에 토큰 사용량이 나와요. 이게 곧 비용이에요!
 
-    public String review(String code) {
-        return anthropic.messages()
-            .model("claude-3-opus")
-            .messages(List.of(
-                new Message("user", "코드 리뷰해줘:\n" + code)
-            ))
-            .call()
-            .getContent();
-    }
+---
+
+## OpenAI는 약간 다르게
+
+OpenAI API는 형식이 조금 달라요:
+
+```java
+public String callOpenAI(String prompt) throws IOException {
+    JsonObject requestBody = new JsonObject();
+    requestBody.addProperty("model", "gpt-4o");
+
+    JsonArray messages = new JsonArray();
+    JsonObject message = new JsonObject();
+    message.addProperty("role", "user");
+    message.addProperty("content", prompt);
+    messages.add(message);
+    requestBody.add("messages", messages);
+
+    Request request = new Request.Builder()
+        .url("https://api.openai.com/v1/chat/completions")
+        .addHeader("Authorization", "Bearer " + System.getenv("OPENAI_API_KEY"))
+        .addHeader("Content-Type", "application/json")
+        .post(...)
+        .build();
+
+    // 응답에서 추출하는 부분도 조금 다름
+    return json.getAsJsonArray("choices")
+        .get(0).getAsJsonObject()
+        .getAsJsonObject("message")
+        .get("content").getAsString();
 }
 ```
 
-### 3. 로컬 LLM (Ollama)
+헤더가 `Authorization: Bearer ...`이고, 응답에서 `choices[0].message.content`를 찾아요.
+
+---
+
+## Ollama: 무료로 로컬에서!
+
+인터넷 없이, 무료로 AI를 쓰고 싶다면 **Ollama**예요:
+
 ```bash
-# CodeLlama 설치
-ollama pull codellama
-
-# 코드 리뷰 요청
-curl http://localhost:11434/api/generate -d '{
-  "model": "codellama",
-  "prompt": "Review this Java code:\n..."
-}'
+# Ollama 설치 후
+ollama run codellama:13b
 ```
 
-## 파일 구조
-```
-code-ai-analyzer/
-└── src/main/java/com/codeai/analyzer/
-    └── ai/
-        └── AICodeReviewer.java    # AI 코드 리뷰어
+API 호출은 더 간단해요:
 
-mini-ai-cli/
-└── src/main/java/com/miniai/cli/
-    └── MiniAiCli.java             # ai-review 명령어 추가
+```java
+public String callOllama(String prompt) throws IOException {
+    JsonObject requestBody = new JsonObject();
+    requestBody.addProperty("model", "codellama:13b");
+    requestBody.addProperty("prompt", prompt);
+    requestBody.addProperty("stream", false);
+
+    Request request = new Request.Builder()
+        .url("http://localhost:11434/api/generate")  // 로컬!
+        .post(...)
+        .build();
+
+    return json.get("response").getAsString();
+}
 ```
 
-## 다음 단계
-- STEP-14: IDE 플러그인 (IntelliJ, VS Code)
-- STEP-15: CI/CD 통합 (GitHub Actions)
-- STEP-16: LLM 연동 (Claude/GPT API)
+API 키도 필요 없고, `localhost`에서 돌아가요!
+
+---
+
+## 에러가 나면?
+
+API 호출은 실패할 수 있어요:
+
+| 에러 코드 | 의미 | 해결책 |
+|-----------|------|--------|
+| **401** | API 키가 잘못됨 | 키 확인 |
+| **429** | 너무 많이 호출함 | 잠시 기다려 |
+| **500** | 서버 문제 | 재시도 |
+
+재시도 로직을 넣으면 좋아요:
+
+```java
+public String callWithRetry(String prompt, int maxRetries) {
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return call(prompt);
+        } catch (IOException e) {
+            // 2, 4, 8초... 점점 길게 대기
+            long waitTime = (long) Math.pow(2, attempt) * 1000;
+            Thread.sleep(waitTime);
+        }
+    }
+    throw new RuntimeException("Max retries exceeded");
+}
+```
+
+이걸 **지수 백오프(Exponential Backoff)**라고 해요.
+
+---
+
+## 통합 클라이언트
+
+여러 제공자를 하나로 묶으면 편해요:
+
+```java
+public class APIClient {
+    private String provider = "claude";
+
+    public String call(String prompt) throws IOException {
+        return switch (provider) {
+            case "claude" -> callClaude(prompt);
+            case "openai" -> callOpenAI(prompt);
+            case "ollama" -> callOllama(prompt);
+            default -> throw new IllegalArgumentException("Unknown: " + provider);
+        };
+    }
+
+    public void setProvider(String provider) {
+        this.provider = provider;
+    }
+}
+```
+
+`setProvider("ollama")`만 하면 로컬 LLM으로 바뀌어요!
+
+---
+
+## 핵심 정리
+
+1. **API = AI에게 메시지 보내기** → HTTP POST로 질문, JSON으로 답변
+2. **API 키 = 열쇠** → 환경변수로 관리, 절대 코드에 직접 쓰지 않기
+3. **여러 제공자** → Claude, OpenAI, Ollama 각각 장단점 있음
+4. **에러 처리** → 재시도 로직으로 안정성 확보
+
+---
+
+## 다음 시간 예고
+
+API 호출은 됐어요. 근데 뭘 물어볼지가 중요하죠!
+
+"코드 리뷰해줘"라고 하면 AI도 뭘 해야 할지 모를 거예요. "보안 관점에서 SQL Injection 위험을 찾아서 라인 번호와 함께 JSON 형식으로..."라고 해야 제대로 된 답이 나와요.
+
+다음 STEP에서는 **좋은 프롬프트 만드는 법**을 알아볼게요!
+
+---
+
+## 실습
+
+```bash
+# 환경변수 설정 후
+cd code-ai-part3-service
+../gradlew :step13-api:run
+```
+
+직접 AI에게 질문을 보내고 답변을 받아보세요!
