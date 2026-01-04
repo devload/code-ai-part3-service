@@ -27,6 +27,10 @@ subprojects {
         options.encoding = 'UTF-8'
     }
 
+    tasks.withType(JavaExec) {
+        jvmArgs '-Dfile.encoding=UTF-8', '-Dsun.stdout.encoding=UTF-8', '-Dsun.stderr.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
+    }
+
     dependencies {
         testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
         testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
